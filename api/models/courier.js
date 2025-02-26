@@ -17,11 +17,11 @@ const Courier = sequelize.define('Courier', {
     }
   },
   current_location: {
-    type: DataTypes.GEOMETRY('POINT'), // Gebruik GEOMETRY voor POINT (MySQL 5.7+)
+    type: DataTypes.JSON, // Sla op als array [latitude, longitude], bijv. [50.8503, 4.3517]
     allowNull: true
   },
   destination: {
-    type: DataTypes.GEOMETRY('POINT'), // Gebruik GEOMETRY voor POINT
+    type: DataTypes.JSON, // Sla op als array [latitude, longitude]
     allowNull: true
   },
   availability: {

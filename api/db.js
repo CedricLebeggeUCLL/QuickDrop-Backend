@@ -20,7 +20,7 @@ async function testConnection() {
 // Synchroniseer de modellen met de database (voor ontwikkeling)
 async function syncModels() {
   try {
-    await sequelize.sync({ force: true }); // Gebruik force: false in productie
+    await sequelize.sync({ force: false }); // Gebruik force: false in productie
     console.log('Tabellen gesynced.');
   } catch (error) {
     console.error('Fout bij synchroniseren van tabellen:', error);

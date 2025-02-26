@@ -36,8 +36,8 @@ CREATE TABLE packages (
 CREATE TABLE couriers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL UNIQUE,
-  current_location POINT,
-  destination POINT,
+  current_location JSON, -- Wijzig naar JSON voor [latitude, longitude]
+  destination JSON,      -- Wijzig naar JSON voor [latitude, longitude]
   availability BOOLEAN DEFAULT TRUE,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
@@ -71,9 +71,10 @@ SET @bobsmith_id = (SELECT id FROM users WHERE username = 'bobsmith');
 SET @adminuser_id = (SELECT id FROM users WHERE username = 'adminuser');
 
 -- Voeg standaard testdata toe voor koeriers
-INSERT INTO couriers (user_id, current_location, destination) VALUES 
-(@bobsmith_id, POINT(50.8503, 4.3517), POINT(51.2178, 4.4203)),
-(@adminuser_id, POINT(51.2178, 4.4203), POINT(50.8503, 4.3517));
+-- Converteer POINT naar JSON-arrays [latitude, longitude]
+INSERT INTO couriers (user_id, current_location, destination, availability) VALUES 
+(@bobsmith_id, '[50.8503, 4.3517]', '[51.2178, 4.4203]', TRUE),
+(@adminuser_id, '[51.2178, 4.4203]', '[50.8503, 4.3517]', TRUE);
 
 -- Haal de courier_id op voor de leveringen
 SET @bobsmith_courier_id = (SELECT id FROM couriers WHERE user_id = @bobsmith_id);
