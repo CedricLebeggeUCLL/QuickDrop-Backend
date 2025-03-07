@@ -6,6 +6,8 @@ router.get('/', deliveryController.getDeliveries);
 router.get('/:id', deliveryController.getDeliveryById);
 router.post('/', deliveryController.createDelivery);
 router.put('/:id', deliveryController.updateDelivery);
-router.delete('/:id', deliveryController.deleteDelivery);
+router.delete('/:id', deliveryController.cancelDelivery);
+router.get('/users/:userId', deliveryController.getDeliveryHistory);
+router.post('/search', deliveryController.searchPackages);
 
 module.exports = router;

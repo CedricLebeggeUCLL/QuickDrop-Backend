@@ -1,5 +1,6 @@
 const { sequelize } = require('../db');
 const { DataTypes } = require('sequelize');
+const User = require('./user');
 
 const Package = sequelize.define('Package', {
   id: {
@@ -16,20 +17,32 @@ const Package = sequelize.define('Package', {
     }
   },
   description: {
-    type: DataTypes.TEXT,
+    type: DataTypes.TEXT
+  },
+  pickup_location: {
+    type: DataTypes.JSON,
     allowNull: false
+  },
+  dropoff_location: {
+    type: DataTypes.JSON,
+    allowNull: false
+  },
+  pickup_address: {
+    type: DataTypes.STRING(255)
+  },
+  dropoff_address: {
+    type: DataTypes.STRING(255)
   },
   status: {
     type: DataTypes.ENUM('pending', 'in_transit', 'delivered'),
     defaultValue: 'pending'
-  },
-  created_at: {
-    type: DataTypes.DATE,
-    defaultValue: DataTypes.NOW
   }
 }, {
   tableName: 'packages',
   timestamps: false
 });
+
+// Define association
+Package.belongsTo(User, { foreignKey: 'user_id' });
 
 module.exports = Package;

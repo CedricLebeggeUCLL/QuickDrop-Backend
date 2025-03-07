@@ -1,11 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const packageController = require('../controllers/packageController');
+const deliveryController = require('../controllers/deliveryController');
 
-router.get('/', packageController.getPackages);
-router.get('/:id', packageController.getPackageById);
-router.post('/', packageController.createPackage);
-router.put('/:id', packageController.updatePackage);
-router.delete('/:id', packageController.deletePackage);
+router.get('/', deliveryController.getDeliveries);
+router.get('/:id', deliveryController.getDeliveryById);
+router.post('/', deliveryController.createDelivery);
+router.put('/:id', deliveryController.updateDelivery);
+router.delete('/:id', deliveryController.cancelDelivery);
+router.get('/users/:userId', deliveryController.getDeliveryHistory);
+router.post('/search', deliveryController.searchPackages);
 
 module.exports = router;

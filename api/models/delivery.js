@@ -1,5 +1,7 @@
 const { sequelize } = require('../db');
 const { DataTypes } = require('sequelize');
+const Package = require('./package');
+const Courier = require('./courier');
 
 const Delivery = sequelize.define('Delivery', {
   id: {
@@ -22,18 +24,14 @@ const Delivery = sequelize.define('Delivery', {
       model: 'couriers',
       key: 'id'
     }
-  },
-  pickup_time: {
-    type: DataTypes.DATE,
-    allowNull: true
-  },
-  delivery_time: {
-    type: DataTypes.DATE,
-    allowNull: true
   }
 }, {
   tableName: 'deliveries',
   timestamps: false
 });
+
+// Define associations
+Delivery.belongsTo(Package, { foreignKey: 'package_id' });
+Delivery.belongsTo(Courier, { foreignKey: 'courier_id' });
 
 module.exports = Delivery;

@@ -1,5 +1,6 @@
 const { sequelize } = require('../db');
 const { DataTypes } = require('sequelize');
+const User = require('./user');
 
 const Courier = sequelize.define('Courier', {
   id: {
@@ -17,12 +18,20 @@ const Courier = sequelize.define('Courier', {
     }
   },
   current_location: {
-    type: DataTypes.JSON, // Sla op als array [latitude, longitude], bijv. [50.8503, 4.3517]
-    allowNull: true
+    type: DataTypes.JSON,
+    defaultValue: { lat: 0, lng: 0 }
   },
   destination: {
-    type: DataTypes.JSON, // Sla op als array [latitude, longitude]
+    type: DataTypes.JSON,
     allowNull: true
+  },
+  pickup_radius: {
+    type: DataTypes.FLOAT,
+    defaultValue: 5.0
+  },
+  dropoff_radius: {
+    type: DataTypes.FLOAT,
+    defaultValue: 5.0
   },
   availability: {
     type: DataTypes.BOOLEAN,
@@ -32,5 +41,8 @@ const Courier = sequelize.define('Courier', {
   tableName: 'couriers',
   timestamps: false
 });
+
+// Define association
+Courier.belongsTo(User, { foreignKey: 'user_id' });
 
 module.exports = Courier;
