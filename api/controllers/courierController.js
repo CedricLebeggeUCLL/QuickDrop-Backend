@@ -97,8 +97,8 @@ exports.updateCourier = async (req, res) => {
   try {
     const [updated] = await Courier.update(
       { 
-        current_location: current_location || null,
-        destination: destination || null,
+        current_location: Array.isArray(current_location) ? current_location : [current_location.lat, current_location.lng],
+        destination: Array.isArray(destination) ? destination : [destination.lat, destination.lng],
         pickup_radius: pickup_radius || 5.0,
         dropoff_radius: dropoff_radius || 5.0,
         availability: availability !== undefined ? availability : true
