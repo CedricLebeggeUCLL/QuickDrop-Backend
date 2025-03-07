@@ -45,6 +45,8 @@ CREATE TABLE couriers (
   pickup_radius FLOAT DEFAULT 5.0, -- in km
   dropoff_radius FLOAT DEFAULT 5.0, -- in km
   availability BOOLEAN DEFAULT TRUE,
+  itsme_code VARCHAR(50), -- Nieuwe kolom voor Itsme-verificatiecode
+  license_number VARCHAR(50), -- Nieuwe kolom voor rijbewijs/ID-nummer
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
@@ -78,10 +80,10 @@ INSERT INTO packages (user_id, description, pickup_location, dropoff_location, p
 SET @bobsmith_id = (SELECT id FROM users WHERE username = 'bobsmith');
 SET @adminuser_id = (SELECT id FROM users WHERE username = 'adminuser');
 
--- Insert sample couriers
-INSERT INTO couriers (user_id, current_location, destination, pickup_radius, dropoff_radius, availability) VALUES 
-(@bobsmith_id, '[50.8503, 4.3517]', '[51.2178, 4.4203]', 10.0, 15.0, TRUE),
-(@adminuser_id, '[51.2178, 4.4203]', NULL, 5.0, 5.0, TRUE);
+-- Insert sample couriers met de nieuwe velden
+INSERT INTO couriers (user_id, current_location, destination, pickup_radius, dropoff_radius, availability, itsme_code, license_number) VALUES 
+(@bobsmith_id, '[50.8503, 4.3517]', '[51.2178, 4.4203]', 10.0, 15.0, TRUE, 'ITSME123', 'ABC123456'), -- Voorbeeldwaarden
+(@adminuser_id, '[51.2178, 4.4203]', NULL, 5.0, 5.0, TRUE, 'ITSME456', NULL); -- license_number is optioneel
 
 -- Get courier IDs for deliveries
 SET @bobsmith_courier_id = (SELECT id FROM couriers WHERE user_id = @bobsmith_id);

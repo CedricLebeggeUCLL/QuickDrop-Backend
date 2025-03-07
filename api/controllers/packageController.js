@@ -1,6 +1,8 @@
 const { sequelize } = require('../db');
 const Package = require('../models/package');
 const User = require('../models/user'); // Importeer User-model om te valideren
+const Courier = require('../models/courier'); // Importeer Courier-model voor validatie
+const { haversineDistance } = require('../../utils/distance'); // Zorg dat deze utility bestaat
 
 exports.getPackages = async (req, res) => {
   try {
@@ -13,35 +15,33 @@ exports.getPackages = async (req, res) => {
 
 exports.getPackageById = async (req, res) => {
   try {
-    const package = await Package.findByPk(req.params.id);
-    if (!package) return res.status(404).json({ error: 'Package not found' });
-    res.json(package);
+    const packageItem = await Package.findByPk(req.params.id);
+    if (!packageItem) return res.status(404).json({ error: 'Package not found' });
+    res.json(packageItem);
   } catch (err) {
     res.status(500).json({ error: 'Error fetching package', details: err.message });
   }
 };
 
 exports.addPackage = async (req, res) => {
-  const userId = req.body.user_id; // Will be from JWT later
+  const userId = req.body.user_id; // Wordt later uit JWT gehaald
   const { description, pickup_location, dropoff_location, pickup_address, dropoff_address } = req.body;
 
   if (!pickup_location || !dropoff_location) {
     return res.status(400).json({ error: 'Pickup and dropoff locations are required' });
   }
 
-  // Valideer of user_id bestaat in de users-tabel
   if (!userId || userId <= 0) {
     return res.status(400).json({ error: 'Invalid user_id' });
   }
 
   try {
-    // Controleer of de user_id bestaat
     const user = await User.findByPk(userId);
     if (!user) {
       return res.status(403).json({ error: 'User does not exist' });
     }
 
-    const package = await Package.create({
+    const packageItem = await Package.create({
       user_id: userId,
       description,
       pickup_location,
@@ -50,7 +50,7 @@ exports.addPackage = async (req, res) => {
       dropoff_address,
       status: 'pending'
     });
-    res.status(201).json({ message: 'Package added successfully', packageId: package.id });
+    res.status(201).json({ message: 'Package added successfully', packageId: packageItem.id });
   } catch (err) {
     if (err.name === 'SequelizeForeignKeyConstraintError') {
       res.status(403).json({ error: 'User does not exist', details: err.message });
@@ -89,11 +89,11 @@ exports.trackPackage = async (req, res) => {
   const packageId = req.params.id;
 
   try {
-    const package = await Package.findByPk(packageId);
-    if (!package) {
+    const packageItem = await Package.findByPk(packageId);
+    if (!packageItem) {
       return res.status(404).json({ error: 'Package not found' });
     }
-    if (package.status !== 'in_transit') {
+    if (packageItem.status !== 'in_transit') {
       return res.status(400).json({ error: 'Package is not in transit' });
     }
 
@@ -110,5 +110,43 @@ exports.trackPackage = async (req, res) => {
     res.json({ packageId, currentLocation: courier.current_location });
   } catch (err) {
     res.status(500).json({ error: 'Error tracking package', details: err.message });
+  }
+};
+
+exports.searchPackages = async (req, res) => {
+  const userId = req.body.user_id;
+  const { start_location, destination, pickup_radius, dropoff_radius } = req.body;
+
+  console.log('Request body:', req.body);
+
+  if (!start_location || !destination || !pickup_radius || !dropoff_radius) {
+    return res.status(400).json({ error: 'Start location, destination, pickup radius, and dropoff radius are required' });
+  }
+
+  try {
+    // Controleer of de gebruiker een koerier is
+    const courier = await Courier.findOne({ where: { user_id: userId } });
+    if (!courier) return res.status(403).json({ error: 'User is not a courier' });
+
+    const packages = await Package.findAll({ where: { status: 'pending' } });
+    console.log('Pending packages:', JSON.stringify(packages, null, 2));
+
+    const matchingPackages = packages.filter(packageItem => {
+      try {
+        const pickupDistance = haversineDistance(start_location, packageItem.pickup_location);
+        const dropoffDistance = haversineDistance(destination, packageItem.dropoff_location);
+        console.log(`Package ID ${packageItem.id}: Start = ${JSON.stringify(start_location)}, Pickup = ${JSON.stringify(packageItem.pickup_location)}, Pickup Distance = ${pickupDistance} km`);
+        console.log(`Package ID ${packageItem.id}: Dest = ${JSON.stringify(destination)}, Dropoff = ${JSON.stringify(packageItem.dropoff_location)}, Dropoff Distance = ${dropoffDistance} km`);
+        console.log(`Package ID ${packageItem.id}: Pickup Radius = ${pickup_radius}, Dropoff Radius = ${dropoff_radius}, Match = ${pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius}`);
+        return pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius;
+      } catch (error) {
+        console.error(`Error processing package ID ${packageItem.id}:`, error.message);
+        return false; // Skip pakketten met ongeldige data
+      }
+    });
+
+    res.json({ message: 'Packages found', packages: matchingPackages });
+  } catch (err) {
+    res.status(500).json({ error: 'Error searching packages', details: err.message });
   }
 };

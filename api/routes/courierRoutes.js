@@ -4,6 +4,7 @@ const courierController = require('../controllers/courierController');
 
 router.get('/', courierController.getCouriers);
 router.get('/:id', courierController.getCourierById);
+router.get('/user/:userId', courierController.getCourierByUserId); // Nieuwe endpoint
 router.post('/', courierController.becomeCourier);
 router.put('/:id', courierController.updateCourier);
 router.delete('/:id', courierController.deleteCourier);

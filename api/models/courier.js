@@ -19,7 +19,7 @@ const Courier = sequelize.define('Courier', {
   },
   current_location: {
     type: DataTypes.JSON,
-    defaultValue: { lat: 0, lng: 0 }
+    allowNull: true
   },
   destination: {
     type: DataTypes.JSON,
@@ -36,13 +36,20 @@ const Courier = sequelize.define('Courier', {
   availability: {
     type: DataTypes.BOOLEAN,
     defaultValue: true
+  },
+  itsme_code: {
+    type: DataTypes.STRING(50),
+    allowNull: true // Nullable, maar kan verplicht worden in controller
+  },
+  license_number: {
+    type: DataTypes.STRING(50),
+    allowNull: true // Optioneel
   }
 }, {
   tableName: 'couriers',
   timestamps: false
 });
 
-// Define association
 Courier.belongsTo(User, { foreignKey: 'user_id' });
 
 module.exports = Courier;

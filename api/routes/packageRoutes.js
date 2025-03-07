@@ -1,13 +1,13 @@
 const express = require('express');
 const router = express.Router();
-const packageController = require('../controllers/packageController'); // Zorg dat dit het juiste pad is
+const packageController = require('../controllers/packageController');
 
-// Routes voor pakketten
-router.get('/', packageController.getPackages);           // Alle pakketten ophalen
-router.get('/:id', packageController.getPackageById);     // Specifiek pakket ophalen
-router.post('/', packageController.addPackage);           // Nieuw pakket toevoegen
-router.put('/:id', packageController.updatePackage);      // Pakket bijwerken
-router.delete('/:id', packageController.deletePackage);   // Pakket verwijderen
-router.get('/track/:id', packageController.trackPackage); // Pakket traceren
+router.get('/', packageController.getPackages);
+router.get('/:id', packageController.getPackageById);
+router.post('/', packageController.addPackage);
+router.put('/:id', packageController.updatePackage);
+router.delete('/:id', packageController.deletePackage);
+router.get('/:id/track', packageController.trackPackage);
+router.post('/search', packageController.searchPackages); // Nieuwe zoekroute
 
 module.exports = router;

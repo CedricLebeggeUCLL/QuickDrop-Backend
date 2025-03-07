@@ -27,43 +27,6 @@ exports.getDeliveryById = async (req, res) => {
   }
 };
 
-exports.searchPackages = async (req, res) => {
-  const userId = req.body.user_id;
-  const { start_location, destination, pickup_radius, dropoff_radius } = req.body;
-
-  console.log('Request body:', req.body);
-
-  if (!start_location || !destination || !pickup_radius || !dropoff_radius) {
-    return res.status(400).json({ error: 'Start location, destination, pickup radius, and dropoff radius are required' });
-  }
-
-  try {
-    const courier = await Courier.findOne({ where: { user_id: userId } });
-    if (!courier) return res.status(403).json({ error: 'User is not a courier' });
-
-    const packages = await Package.findAll({ where: { status: 'pending' } });
-    console.log('Pending packages:', JSON.stringify(packages, null, 2));
-
-    const matchingPackages = packages.filter(package => {
-      try {
-        const pickupDistance = haversineDistance(start_location, package.pickup_location);
-        const dropoffDistance = haversineDistance(destination, package.dropoff_location);
-        console.log(`Package ID ${package.id}: Start = ${JSON.stringify(start_location)}, Pickup = ${JSON.stringify(package.pickup_location)}, Pickup Distance = ${pickupDistance} km`);
-        console.log(`Package ID ${package.id}: Dest = ${JSON.stringify(destination)}, Dropoff = ${JSON.stringify(package.dropoff_location)}, Dropoff Distance = ${dropoffDistance} km`);
-        console.log(`Package ID ${package.id}: Pickup Radius = ${pickup_radius}, Dropoff Radius = ${dropoff_radius}, Match = ${pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius}`);
-        return pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius;
-      } catch (error) {
-        console.error(`Error processing package ID ${package.id}:`, error.message);
-        return false; // Skip packages with invalid data
-      }
-    });
-
-    res.json({ message: 'Packages found', packages: matchingPackages });
-  } catch (err) {
-    res.status(500).json({ error: 'Error searching packages', details: err.message });
-  }
-};
-
 exports.createDelivery = async (req, res) => {
   const userId = req.body.user_id;
   const { package_id, start_location, destination, pickup_radius, dropoff_radius } = req.body;
