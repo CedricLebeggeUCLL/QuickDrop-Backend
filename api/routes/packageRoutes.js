@@ -8,6 +8,6 @@ router.post('/', packageController.addPackage);
 router.put('/:id', packageController.updatePackage);
 router.delete('/:id', packageController.deletePackage);
 router.get('/:id/track', packageController.trackPackage);
-router.post('/search', packageController.searchPackages); // Nieuwe zoekroute
+router.post('/search', packageController.searchPackages); // Moet aanwezig zijn
 
 module.exports = router;

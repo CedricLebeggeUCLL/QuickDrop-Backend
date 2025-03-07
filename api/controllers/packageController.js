@@ -124,24 +124,23 @@ exports.searchPackages = async (req, res) => {
   }
 
   try {
-    // Controleer of de gebruiker een koerier is
     const courier = await Courier.findOne({ where: { user_id: userId } });
     if (!courier) return res.status(403).json({ error: 'User is not a courier' });
 
     const packages = await Package.findAll({ where: { status: 'pending' } });
     console.log('Pending packages:', JSON.stringify(packages, null, 2));
 
-    const matchingPackages = packages.filter(packageItem => {
+    const matchingPackages = packages.filter(package => {
       try {
-        const pickupDistance = haversineDistance(start_location, packageItem.pickup_location);
-        const dropoffDistance = haversineDistance(destination, packageItem.dropoff_location);
-        console.log(`Package ID ${packageItem.id}: Start = ${JSON.stringify(start_location)}, Pickup = ${JSON.stringify(packageItem.pickup_location)}, Pickup Distance = ${pickupDistance} km`);
-        console.log(`Package ID ${packageItem.id}: Dest = ${JSON.stringify(destination)}, Dropoff = ${JSON.stringify(packageItem.dropoff_location)}, Dropoff Distance = ${dropoffDistance} km`);
-        console.log(`Package ID ${packageItem.id}: Pickup Radius = ${pickup_radius}, Dropoff Radius = ${dropoff_radius}, Match = ${pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius}`);
+        const pickupDistance = haversineDistance(start_location, package.pickup_location);
+        const dropoffDistance = haversineDistance(destination, package.dropoff_location);
+        console.log(`Package ID ${package.id}: Start = ${JSON.stringify(start_location)}, Pickup = ${JSON.stringify(package.pickup_location)}, Pickup Distance = ${pickupDistance} km`);
+        console.log(`Package ID ${package.id}: Dest = ${JSON.stringify(destination)}, Dropoff = ${JSON.stringify(package.dropoff_location)}, Dropoff Distance = ${dropoffDistance} km`);
+        console.log(`Package ID ${package.id}: Pickup Radius = ${pickup_radius}, Dropoff Radius = ${dropoff_radius}, Match = ${pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius}`);
         return pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius;
       } catch (error) {
-        console.error(`Error processing package ID ${packageItem.id}:`, error.message);
-        return false; // Skip pakketten met ongeldige data
+        console.error(`Error processing package ID ${package.id}:`, error.message);
+        return false;
       }
     });
 
