@@ -1,5 +1,6 @@
 const { sequelize } = require('../db');
 const Package = require('../models/package');
+const User = require('../models/user'); // Importeer User-model om te valideren
 
 exports.getPackages = async (req, res) => {
   try {
@@ -28,7 +29,18 @@ exports.addPackage = async (req, res) => {
     return res.status(400).json({ error: 'Pickup and dropoff locations are required' });
   }
 
+  // Valideer of user_id bestaat in de users-tabel
+  if (!userId || userId <= 0) {
+    return res.status(400).json({ error: 'Invalid user_id' });
+  }
+
   try {
+    // Controleer of de user_id bestaat
+    const user = await User.findByPk(userId);
+    if (!user) {
+      return res.status(403).json({ error: 'User does not exist' });
+    }
+
     const package = await Package.create({
       user_id: userId,
       description,
@@ -40,7 +52,11 @@ exports.addPackage = async (req, res) => {
     });
     res.status(201).json({ message: 'Package added successfully', packageId: package.id });
   } catch (err) {
-    res.status(500).json({ error: 'Error adding package', details: err.message });
+    if (err.name === 'SequelizeForeignKeyConstraintError') {
+      res.status(403).json({ error: 'User does not exist', details: err.message });
+    } else {
+      res.status(500).json({ error: 'Error adding package', details: err.message });
+    }
   }
 };
 
