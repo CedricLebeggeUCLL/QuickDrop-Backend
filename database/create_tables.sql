@@ -92,7 +92,9 @@ CREATE TABLE deliveries (
 -- Insert sample postal_codes
 INSERT INTO postal_codes (code, city, country) VALUES
 ('1000', 'Brussels', 'Belgium'),
-('2000', 'Antwerp', 'Belgium');
+('1910', 'Kampenhout', 'Belgium'),
+('2000', 'Antwerp', 'Belgium'),
+('3300', 'Tienen', 'Belgium');
 
 -- Insert sample addresses (met optioneel extra_info)
 INSERT INTO addresses (street_name, house_number, extra_info, postal_code) VALUES
