@@ -70,18 +70,88 @@ exports.createDelivery = async (req, res) => {
 };
 
 exports.updateDelivery = async (req, res) => {
-  const { package_id, courier_id } = req.body;
+  const { status, pickup_time, delivery_time } = req.body; // Ontvang status en tijdstempels
+  const validDeliveryStatuses = ['assigned', 'picked_up', 'delivered'];
+  const validPackageStatuses = ['pending', 'assigned', 'in_transit', 'delivered'];
+  console.log('Received update request for deliveryId:', req.params.id, 'with status:', status, 'pickup_time:', pickup_time, 'delivery_time:', delivery_time);
+
+  if (!status || !validDeliveryStatuses.includes(status)) {
+    return res.status(400).json({ error: 'Invalid delivery status value. Must be one of: assigned, picked_up, delivered' });
+  }
+
+  const transaction = await sequelize.transaction(); // Start een transactie
   try {
+    const updateData = { status };
+
+    // Stel pickup_time in bij 'picked_up'
+    if (status === 'picked_up') {
+      updateData.pickup_time = pickup_time ? new Date(pickup_time) : new Date();
+      console.log('Setting pickup_time to:', updateData.pickup_time);
+
+      // Werk de package-status bij naar 'in_transit'
+      const delivery = await Delivery.findByPk(req.params.id, { transaction });
+      if (!delivery || !delivery.package_id) {
+        console.log('No valid package_id found for delivery:', req.params.id);
+        await transaction.rollback();
+        return res.status(400).json({ error: 'No associated package found' });
+      }
+      const [packageUpdated] = await Package.update(
+        { status: 'in_transit' },
+        { where: { id: delivery.package_id }, transaction }
+      );
+      if (packageUpdated === 0) {
+        console.log('Failed to update package status to in_transit for package_id:', delivery.package_id);
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Failed to update package status to in_transit' });
+      }
+      console.log('Successfully updated package status to in_transit for package_id:', delivery.package_id);
+    }
+
+    // Stel delivery_time in bij 'delivered'
+    if (status === 'delivered') {
+      updateData.delivery_time = delivery_time ? new Date(delivery_time) : new Date();
+      console.log('Setting delivery_time to:', updateData.delivery_time);
+
+      // Werk de package-status bij naar 'delivered'
+      const delivery = await Delivery.findByPk(req.params.id, { transaction });
+      if (!delivery || !delivery.package_id) {
+        console.log('No valid package_id found for delivery:', req.params.id);
+        await transaction.rollback();
+        return res.status(400).json({ error: 'No associated package found' });
+      }
+      const [packageUpdated] = await Package.update(
+        { status: 'delivered' },
+        { where: { id: delivery.package_id }, transaction }
+      );
+      if (packageUpdated === 0) {
+        console.log('Failed to update package status to delivered for package_id:', delivery.package_id);
+        await transaction.rollback();
+        return res.status(404).json({ error: 'Failed to update package status to delivered' });
+      }
+      console.log('Successfully updated package status to delivered for package_id:', delivery.package_id);
+    }
+
     const [updated] = await Delivery.update(
-      { package_id, courier_id },
-      { where: { id: req.params.id } }
+      updateData,
+      { where: { id: req.params.id }, transaction }
     );
-    if (updated === 0) return res.status(404).json({ error: 'Delivery not found' });
+
+    if (updated === 0) {
+      await transaction.rollback();
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+
     const updatedDelivery = await Delivery.findByPk(req.params.id, {
-      include: [Package, Courier]
+      include: [Package, Courier],
+      transaction
     });
+
+    await transaction.commit(); // Commit de transactie als alles succesvol is
+    console.log('Update successful, returning:', updatedDelivery);
     res.json(updatedDelivery);
   } catch (err) {
+    await transaction.rollback(); // Rol terug bij fout
+    console.error('Error updating delivery:', err.message, err.stack);
     res.status(500).json({ error: 'Error updating delivery', details: err.message });
   }
 };

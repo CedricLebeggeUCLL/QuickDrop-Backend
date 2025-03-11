@@ -34,7 +34,7 @@ const Package = sequelize.define('Package', {
     type: DataTypes.STRING(255)
   },
   status: {
-    type: DataTypes.ENUM('pending', 'in_transit', 'delivered'),
+    type: DataTypes.ENUM('pending', 'assigned', 'in_transit', 'delivered'),
     defaultValue: 'pending'
   }
 }, {
