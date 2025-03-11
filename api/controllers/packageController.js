@@ -1,3 +1,4 @@
+const { sequelize } = require('../db');
 const { haversineDistance } = require('../../utils/distance');
 const { geocodeAddress } = require('../../utils/geocode');
 const Package = require('../models/package');
