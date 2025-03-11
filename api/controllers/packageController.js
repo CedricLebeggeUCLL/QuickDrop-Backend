@@ -223,6 +223,10 @@ exports.searchPackages = async (req, res) => {
     return res.status(400).json({ error: 'Pickup radius and dropoff radius are required' });
   }
 
+  if (!start_address.city || !start_address.country || !destination_address.city || !destination_address.country) {
+    return res.status(400).json({ error: 'City and country are required for both start and destination addresses' });
+  }
+
   try {
     // Haal de courier op
     const courier = await Courier.findOne({
@@ -240,7 +244,7 @@ exports.searchPackages = async (req, res) => {
       return res.status(400).json({ error: 'Courier must have a start and destination address set' });
     }
 
-    // Maak nieuwe adressen aan vanuit het verzoek
+    // Maak nieuwe adressen aan vanuit het verzoek, maar controleer op duplicaten
     let startAddressData = start_address;
     if (use_current_as_start && courier.currentAddress) {
       startAddressData = {
@@ -248,7 +252,45 @@ exports.searchPackages = async (req, res) => {
         house_number: courier.currentAddress.house_number,
         extra_info: courier.currentAddress.extra_info,
         postal_code: courier.currentAddress.postal_code,
+        city: start_address.city,
+        country: start_address.country,
       };
+    }
+
+    // Controleer of het startadres al bestaat
+    let startAddress = await Address.findOne({
+      where: {
+        street_name: startAddressData.street_name,
+        house_number: startAddressData.house_number,
+        extra_info: startAddressData.extra_info,
+        postal_code: startAddressData.postal_code,
+      },
+    });
+    if (!startAddress) {
+      startAddress = await Address.create({
+        street_name: startAddressData.street_name,
+        house_number: startAddressData.house_number,
+        extra_info: startAddressData.extra_info,
+        postal_code: startAddressData.postal_code,
+      });
+    }
+
+    // Controleer of het bestemmingsadres al bestaat
+    let destAddress = await Address.findOne({
+      where: {
+        street_name: destination_address.street_name,
+        house_number: destination_address.house_number,
+        extra_info: destination_address.extra_info,
+        postal_code: destination_address.postal_code,
+      },
+    });
+    if (!destAddress) {
+      destAddress = await Address.create({
+        street_name: destination_address.street_name,
+        house_number: destination_address.house_number,
+        extra_info: destination_address.extra_info,
+        postal_code: destination_address.postal_code,
+      });
     }
 
     // Controleer of de opgegeven postcode bestaat, zo niet, voeg toe
@@ -270,22 +312,7 @@ exports.searchPackages = async (req, res) => {
       });
     }
 
-    // Maak nieuwe adressen aan voor start en destination
-    const startAddress = await Address.create({
-      street_name: startAddressData.street_name,
-      house_number: startAddressData.house_number,
-      extra_info: startAddressData.extra_info,
-      postal_code: startAddressData.postal_code,
-    });
-
-    const destAddress = await Address.create({
-      street_name: destination_address.street_name,
-      house_number: destination_address.house_number,
-      extra_info: destination_address.extra_info,
-      postal_code: destination_address.postal_code,
-    });
-
-    // Update de courier met de nieuwe adressen
+    // Update de courier met de bestaande of nieuwe adressen
     await courier.update({
       start_address_id: startAddress.id,
       destination_address_id: destAddress.id,
