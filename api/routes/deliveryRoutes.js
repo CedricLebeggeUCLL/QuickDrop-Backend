@@ -8,5 +8,6 @@ router.post('/', deliveryController.createDelivery);
 router.put('/:id', deliveryController.updateDelivery);
 router.delete('/:id', deliveryController.cancelDelivery);
 router.get('/users/:userId', deliveryController.getDeliveryHistory);
+router.get('/couriers/:userId', deliveryController.getCourierDeliveries); // Nieuwe route
 
 module.exports = router;

@@ -53,7 +53,15 @@ exports.createDelivery = async (req, res) => {
       { where: { user_id: userId } }
     );
 
-    const delivery = await Delivery.create({ package_id: package.id, courier_id: courier.id });
+    // Maak een nieuwe Delivery met pickup_location en dropoff_location
+    const delivery = await Delivery.create({
+      package_id: package.id,
+      courier_id: courier.id,
+      pickup_location: package.pickup_location, // Kopieer van het pakket
+      dropoff_location: package.dropoff_location, // Kopieer van het pakket
+      status: 'assigned' // Default waarde, maar expliciet ingesteld
+    });
+
     await Package.update({ status: 'in_transit' }, { where: { id: package.id } });
     res.status(201).json({ message: 'Delivery created successfully', deliveryId: delivery.id });
   } catch (err) {
@@ -105,5 +113,25 @@ exports.getDeliveryHistory = async (req, res) => {
     res.json(deliveries);
   } catch (err) {
     res.status(500).json({ error: 'Error fetching delivery history', details: err.message });
+  }
+};
+
+exports.getCourierDeliveries = async (req, res) => {
+  const userId = req.params.userId;
+
+  try {
+    const courier = await Courier.findOne({ where: { user_id: userId } });
+    if (!courier) {
+      return res.status(404).json({ error: 'Courier not found for this user' });
+    }
+
+    const deliveries = await Delivery.findAll({
+      where: { courier_id: courier.id },
+      include: [Package, Courier]
+    });
+
+    res.json(deliveries);
+  } catch (err) {
+    res.status(500).json({ error: 'Error fetching courier deliveries', details: err.message });
   }
 };

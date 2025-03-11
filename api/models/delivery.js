@@ -24,6 +24,27 @@ const Delivery = sequelize.define('Delivery', {
       model: 'couriers',
       key: 'id'
     }
+  },
+  pickup_location: {
+    type: DataTypes.JSON,
+    allowNull: false
+  },
+  dropoff_location: {
+    type: DataTypes.JSON,
+    allowNull: false
+  },
+  pickup_time: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  delivery_time: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  status: {
+    type: DataTypes.ENUM('assigned', 'picked_up', 'in_transit', 'delivered'),
+    allowNull: false,
+    defaultValue: 'assigned'
   }
 }, {
   tableName: 'deliveries',
