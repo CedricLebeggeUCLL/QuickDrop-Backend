@@ -1,48 +1,56 @@
+const { Sequelize, DataTypes } = require('sequelize');
 const { sequelize } = require('../db');
-const { DataTypes } = require('sequelize');
 const User = require('./user');
+const Address = require('./address');
 
 const Package = sequelize.define('Package', {
   id: {
     type: DataTypes.INTEGER,
     autoIncrement: true,
-    primaryKey: true
+    primaryKey: true,
   },
   user_id: {
     type: DataTypes.INTEGER,
     allowNull: false,
     references: {
-      model: 'users',
-      key: 'id'
-    }
+      model: User,
+      key: 'id',
+    },
   },
   description: {
-    type: DataTypes.TEXT
+    type: DataTypes.TEXT,
   },
-  pickup_location: {
-    type: DataTypes.JSON,
-    allowNull: false
+  pickup_address_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: Address,
+      key: 'id',
+    },
   },
-  dropoff_location: {
-    type: DataTypes.JSON,
-    allowNull: false
-  },
-  pickup_address: {
-    type: DataTypes.STRING(255)
-  },
-  dropoff_address: {
-    type: DataTypes.STRING(255)
+  dropoff_address_id: {
+    type: DataTypes.INTEGER,
+    allowNull: false,
+    references: {
+      model: Address,
+      key: 'id',
+    },
   },
   status: {
     type: DataTypes.ENUM('pending', 'assigned', 'in_transit', 'delivered'),
-    defaultValue: 'pending'
-  }
+    defaultValue: 'pending',
+  },
+  created_at: {
+    type: DataTypes.DATE,
+    defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+  },
 }, {
   tableName: 'packages',
-  timestamps: false
+  timestamps: false,
 });
 
-// Define association
 Package.belongsTo(User, { foreignKey: 'user_id' });
+Package.belongsTo(Address, { foreignKey: 'pickup_address_id', as: 'pickupAddress' });
+Package.belongsTo(Address, { foreignKey: 'dropoff_address_id', as: 'dropoffAddress' });
 
 module.exports = Package;
