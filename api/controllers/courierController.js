@@ -1,10 +1,17 @@
 const { sequelize } = require('../db');
 const Courier = require('../models/courier');
 const User = require('../models/user');
+const Address = require('../models/address');
 
 exports.getCouriers = async (req, res) => {
   try {
-    const couriers = await Courier.findAll();
+    const couriers = await Courier.findAll({
+      include: [
+        { model: Address, as: 'currentAddress' },
+        { model: Address, as: 'startAddress' },
+        { model: Address, as: 'destinationAddress' },
+      ],
+    });
     res.json(couriers);
   } catch (err) {
     res.status(500).json({ error: 'Error fetching couriers', details: err.message });
@@ -13,7 +20,13 @@ exports.getCouriers = async (req, res) => {
 
 exports.getCourierById = async (req, res) => {
   try {
-    const courier = await Courier.findByPk(req.params.id);
+    const courier = await Courier.findByPk(req.params.id, {
+      include: [
+        { model: Address, as: 'currentAddress' },
+        { model: Address, as: 'startAddress' },
+        { model: Address, as: 'destinationAddress' },
+      ],
+    });
     if (!courier) return res.status(404).json({ error: 'Courier not found' });
     res.json(courier);
   } catch (err) {
@@ -23,7 +36,14 @@ exports.getCourierById = async (req, res) => {
 
 exports.getCourierByUserId = async (req, res) => {
   try {
-    const courier = await Courier.findOne({ where: { user_id: req.params.userId } });
+    const courier = await Courier.findOne({
+      where: { user_id: req.params.userId },
+      include: [
+        { model: Address, as: 'currentAddress' },
+        { model: Address, as: 'startAddress' },
+        { model: Address, as: 'destinationAddress' },
+      ],
+    });
     if (!courier) return res.status(404).json({ error: 'Courier not found for this user' });
     res.json(courier);
   } catch (err) {
@@ -42,73 +62,131 @@ exports.becomeCourier = async (req, res) => {
     return res.status(400).json({ error: 'Itsme verification code is required' });
   }
 
+  const transaction = await sequelize.transaction(); // Start een transactie
   try {
-    // Controleer of de user bestaat vóór het aanmaken van de courier
-    const user = await User.findByPk(user_id);
+    // Controleer of de user bestaat
+    const user = await User.findByPk(user_id, { transaction });
     if (!user) {
       console.log(`User met ID ${user_id} niet gevonden`);
+      await transaction.rollback();
       return res.status(404).json({ error: 'User does not exist' });
     }
 
     // Controleer of de user al een courier is
-    const existingCourier = await Courier.findOne({ where: { user_id } });
+    const existingCourier = await Courier.findOne({ where: { user_id }, transaction });
     if (existingCourier) {
+      await transaction.rollback();
       return res.status(400).json({ error: 'User is already a courier' });
     }
 
-    // Maak de nieuwe courier
+    // Maak de nieuwe courier zonder coördinaten, maar met optionele adressen
     const courierData = {
-      user_id: user_id,
-      current_location: null,
-      destination: null,
+      user_id,
+      current_address_id: null, // Optioneel, kan later worden ingesteld
+      start_address_id: null,  // Wordt later ingesteld via update
+      destination_address_id: null, // Wordt later ingesteld via update
       pickup_radius: 5.0,
       dropoff_radius: 5.0,
       availability: true,
-      itsme_code: itsme_code,
-      license_number: license_number || null
+      itsme_code,
+      license_number: license_number || null,
     };
 
-    console.log('Data to create:', courierData); // Debug-log: wat we opslaan
-    const courier = await Courier.create(courierData);
-    console.log('Created courier:', courier.toJSON()); // Debug-log: opgeslagen courier
+    console.log('Data to create:', courierData);
+    const courier = await Courier.create(courierData, { transaction });
+    console.log('Created courier:', courier.toJSON());
 
     // Update de rol van de gebruiker naar 'courier'
     const [updated] = await User.update(
       { role: 'courier' },
-      { where: { id: user_id } }
+      { where: { id: user_id }, transaction }
     );
-    console.log(`Updated ${updated} user rows to role 'courier' for user_id ${user_id}`); // Debug-log
+    console.log(`Updated ${updated} user rows to role 'courier' for user_id ${user_id}`);
 
     if (updated === 0) {
-      // Rollback: verwijder de courier als de rol-update faalt
-      await Courier.destroy({ where: { id: courier.id } });
+      await Courier.destroy({ where: { id: courier.id }, transaction });
+      await transaction.rollback();
       return res.status(500).json({ error: 'Failed to update user role, courier creation rolled back' });
     }
 
+    await transaction.commit();
     res.status(201).json({ message: 'Courier created successfully', courierId: courier.id });
   } catch (err) {
-    console.error('Error in becomeCourier:', err); // Debug-log: eventuele fouten
+    await transaction.rollback();
+    console.error('Error in becomeCourier:', err);
     res.status(500).json({ error: 'Error creating courier', details: err.message });
   }
 };
 
 exports.updateCourier = async (req, res) => {
-  const { current_location, destination, pickup_radius, dropoff_radius, availability } = req.body;
+  const { start_address, destination_address, pickup_radius, dropoff_radius, availability } = req.body;
+  const transaction = await sequelize.transaction();
+
   try {
-    const [updated] = await Courier.update(
-      { 
-        current_location: Array.isArray(current_location) ? current_location : [current_location.lat, current_location.lng],
-        destination: Array.isArray(destination) ? destination : [destination.lat, destination.lng],
-        pickup_radius: pickup_radius || 5.0,
-        dropoff_radius: dropoff_radius || 5.0,
-        availability: availability !== undefined ? availability : true
-      },
-      { where: { id: req.params.id } }
-    );
-    if (updated === 0) return res.status(404).json({ error: 'Courier not found' });
-    const updatedCourier = await Courier.findByPk(req.params.id);
+    // Haal de bestaande courier op
+    const courier = await Courier.findByPk(req.params.id, { transaction });
+    if (!courier) {
+      await transaction.rollback();
+      return res.status(404).json({ error: 'Courier not found' });
+    }
+
+    // Maak of gebruik bestaande adressen
+    let startAddressId, destAddressId;
+    if (start_address) {
+      const [startAddress, created] = await Address.findOrCreate({
+        where: {
+          street_name: start_address.street_name,
+          house_number: start_address.house_number,
+          extra_info: start_address.extra_info || null,
+          postal_code: start_address.postal_code,
+        },
+        defaults: start_address,
+        transaction,
+      });
+      startAddressId = startAddress.id;
+    }
+
+    if (destination_address) {
+      const [destAddress, created] = await Address.findOrCreate({
+        where: {
+          street_name: destination_address.street_name,
+          house_number: destination_address.house_number,
+          extra_info: destination_address.extra_info || null,
+          postal_code: destination_address.postal_code,
+        },
+        defaults: destination_address,
+        transaction,
+      });
+      destAddressId = destAddress.id;
+    }
+
+    const updateData = {
+      ...(startAddressId && { start_address_id: startAddressId }),
+      ...(destAddressId && { destination_address_id: destAddressId }),
+      pickup_radius: pickup_radius || courier.pickup_radius,
+      dropoff_radius: dropoff_radius || courier.dropoff_radius,
+      availability: availability !== undefined ? availability : courier.availability,
+    };
+
+    const [updated] = await Courier.update(updateData, { where: { id: req.params.id }, transaction });
+    if (updated === 0) {
+      await transaction.rollback();
+      return res.status(404).json({ error: 'Courier not found' });
+    }
+
+    const updatedCourier = await Courier.findByPk(req.params.id, {
+      include: [
+        { model: Address, as: 'currentAddress' },
+        { model: Address, as: 'startAddress' },
+        { model: Address, as: 'destinationAddress' },
+      ],
+      transaction,
+    });
+
+    await transaction.commit();
     res.json(updatedCourier);
   } catch (err) {
+    await transaction.rollback();
     res.status(500).json({ error: 'Error updating courier', details: err.message });
   }
 };

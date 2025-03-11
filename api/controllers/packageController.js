@@ -4,10 +4,16 @@ const Package = require('../models/package');
 const Courier = require('../models/courier');
 const Address = require('../models/address');
 const PostalCode = require('../models/postalcode');
+const User = require('../models/user');
 
 exports.getPackages = async (req, res) => {
   try {
-    const packages = await Package.findAll();
+    const packages = await Package.findAll({
+      include: [
+        { model: Address, as: 'pickupAddress' },
+        { model: Address, as: 'dropoffAddress' },
+      ],
+    });
     res.json(packages);
   } catch (err) {
     res.status(500).json({ error: 'Error fetching packages', details: err.message });
@@ -16,7 +22,12 @@ exports.getPackages = async (req, res) => {
 
 exports.getPackageById = async (req, res) => {
   try {
-    const packageItem = await Package.findByPk(req.params.id);
+    const packageItem = await Package.findByPk(req.params.id, {
+      include: [
+        { model: Address, as: 'pickupAddress' },
+        { model: Address, as: 'dropoffAddress' },
+      ],
+    });
     if (!packageItem) return res.status(404).json({ error: 'Package not found' });
     res.json(packageItem);
   } catch (err) {
@@ -25,34 +36,61 @@ exports.getPackageById = async (req, res) => {
 };
 
 exports.addPackage = async (req, res) => {
-  const userId = req.body.user_id; // Wordt later uit JWT gehaald
-  const { description, pickup_location, dropoff_location, pickup_address, dropoff_address } = req.body;
+  const userId = req.body.user_id;
+  const { description, pickup_address, dropoff_address } = req.body;
 
-  if (!pickup_location || !dropoff_location) {
-    return res.status(400).json({ error: 'Pickup and dropoff locations are required' });
+  if (!pickup_address || !dropoff_address) {
+    return res.status(400).json({ error: 'Pickup and dropoff addresses are required' });
   }
 
   if (!userId || userId <= 0) {
     return res.status(400).json({ error: 'Invalid user_id' });
   }
 
+  const transaction = await sequelize.transaction();
   try {
-    const user = await User.findByPk(userId);
+    const user = await User.findByPk(userId, { transaction });
     if (!user) {
+      await transaction.rollback();
       return res.status(403).json({ error: 'User does not exist' });
     }
+
+    // Maak pickup-adres
+    const [pickupAddress] = await Address.findOrCreate({
+      where: {
+        street_name: pickup_address.street_name,
+        house_number: pickup_address.house_number,
+        extra_info: pickup_address.extra_info || null,
+        postal_code: pickup_address.postal_code,
+      },
+      defaults: pickup_address,
+      transaction,
+    });
+
+    // Maak dropoff-adres
+    const [dropoffAddress] = await Address.findOrCreate({
+      where: {
+        street_name: dropoff_address.street_name,
+        house_number: dropoff_address.house_number,
+        extra_info: dropoff_address.extra_info || null,
+        postal_code: dropoff_address.postal_code,
+      },
+      defaults: dropoff_address,
+      transaction,
+    });
 
     const packageItem = await Package.create({
       user_id: userId,
       description,
-      pickup_location,
-      dropoff_location,
-      pickup_address,
-      dropoff_address,
-      status: 'pending'
-    });
+      pickup_address_id: pickupAddress.id,
+      dropoff_address_id: dropoffAddress.id,
+      status: 'pending',
+    }, { transaction });
+
+    await transaction.commit();
     res.status(201).json({ message: 'Package added successfully', packageId: packageItem.id });
   } catch (err) {
+    await transaction.rollback();
     if (err.name === 'SequelizeForeignKeyConstraintError') {
       res.status(403).json({ error: 'User does not exist', details: err.message });
     } else {
@@ -62,16 +100,67 @@ exports.addPackage = async (req, res) => {
 };
 
 exports.updatePackage = async (req, res) => {
-  const { description, pickup_location, dropoff_location, pickup_address, dropoff_address, status } = req.body;
+  const { description, pickup_address, dropoff_address, status } = req.body;
+  const transaction = await sequelize.transaction();
   try {
+    let pickupAddressId, dropoffAddressId;
+
+    if (pickup_address) {
+      const [pickupAddress] = await Address.findOrCreate({
+        where: {
+          street_name: pickup_address.street_name,
+          house_number: pickup_address.house_number,
+          extra_info: pickup_address.extra_info || null,
+          postal_code: pickup_address.postal_code,
+        },
+        defaults: pickup_address,
+        transaction,
+      });
+      pickupAddressId = pickupAddress.id;
+    }
+
+    if (dropoff_address) {
+      const [dropoffAddress] = await Address.findOrCreate({
+        where: {
+          street_name: dropoff_address.street_name,
+          house_number: dropoff_address.house_number,
+          extra_info: dropoff_address.extra_info || null,
+          postal_code: dropoff_address.postal_code,
+        },
+        defaults: dropoff_address,
+        transaction,
+      });
+      dropoffAddressId = dropoffAddress.id;
+    }
+
+    const updateData = {
+      description,
+      ...(pickupAddressId && { pickup_address_id: pickupAddressId }),
+      ...(dropoffAddressId && { dropoff_address_id: dropoffAddressId }),
+      status,
+    };
+
     const [updated] = await Package.update(
-      { description, pickup_location, dropoff_location, pickup_address, dropoff_address, status },
-      { where: { id: req.params.id } }
+      updateData,
+      { where: { id: req.params.id }, transaction }
     );
-    if (updated === 0) return res.status(404).json({ error: 'Package not found' });
-    const updatedPackage = await Package.findByPk(req.params.id);
+    if (updated === 0) {
+      await transaction.rollback();
+      return res.status(404).json({ error: 'Package not found' });
+    }
+
+    const updatedPackage = await Package.findByPk(req.params.id, {
+      include: [
+        { model: Address, as: 'pickupAddress' },
+        { model: Address, as: 'dropoffAddress' },
+      ],
+      transaction,
+    });
+
+    await transaction.commit();
     res.json(updatedPackage);
   } catch (err) {
+    await transaction.rollback();
     res.status(500).json({ error: 'Error updating package', details: err.message });
   }
 };
@@ -90,7 +179,12 @@ exports.trackPackage = async (req, res) => {
   const packageId = req.params.id;
 
   try {
-    const packageItem = await Package.findByPk(packageId);
+    const packageItem = await Package.findByPk(packageId, {
+      include: [
+        { model: Address, as: 'pickupAddress' },
+        { model: Address, as: 'dropoffAddress' },
+      ],
+    });
     if (!packageItem) {
       return res.status(404).json({ error: 'Package not found' });
     }
@@ -103,12 +197,16 @@ exports.trackPackage = async (req, res) => {
       return res.status(404).json({ error: 'Delivery not found' });
     }
 
-    const courier = await Courier.findByPk(delivery.courier_id);
+    const courier = await Courier.findByPk(delivery.courier_id, {
+      include: [{ model: Address, as: 'currentAddress' }],
+    });
     if (!courier) {
       return res.status(404).json({ error: 'Courier not found' });
     }
 
-    res.json({ packageId, currentLocation: courier.current_location });
+    // Geocode het huidige adres van de courier voor tracking
+    const currentCoords = await geocodeAddress(courier.currentAddress);
+    res.json({ packageId, currentLocation: currentCoords });
   } catch (err) {
     res.status(500).json({ error: 'Error tracking package', details: err.message });
   }
@@ -116,7 +214,7 @@ exports.trackPackage = async (req, res) => {
 
 exports.searchPackages = async (req, res) => {
   const userId = req.body.user_id;
-  const { start_location, destination, pickup_radius, dropoff_radius, use_current_as_start } = req.body;
+  const { start_address, destination_address, pickup_radius, dropoff_radius, use_current_as_start } = req.body;
 
   console.log('Request body:', req.body);
 
@@ -142,15 +240,13 @@ exports.searchPackages = async (req, res) => {
     }
 
     // Maak nieuwe adressen aan vanuit het verzoek
-    let startAddressData = start_location;
+    let startAddressData = start_address;
     if (use_current_as_start && courier.currentAddress) {
       startAddressData = {
         street_name: courier.currentAddress.street_name,
         house_number: courier.currentAddress.house_number,
         extra_info: courier.currentAddress.extra_info,
         postal_code: courier.currentAddress.postal_code,
-        city: (await PostalCode.findByPk(courier.currentAddress.postal_code)).city,
-        country: (await PostalCode.findByPk(courier.currentAddress.postal_code)).country,
       };
     }
 
@@ -164,12 +260,12 @@ exports.searchPackages = async (req, res) => {
       });
     }
 
-    const destPostalCode = await PostalCode.findByPk(destination.postal_code);
+    const destPostalCode = await PostalCode.findByPk(destination_address.postal_code);
     if (!destPostalCode) {
       await PostalCode.create({
-        code: destination.postal_code,
-        city: destination.city,
-        country: destination.country,
+        code: destination_address.postal_code,
+        city: destination_address.city,
+        country: destination_address.country,
       });
     }
 
@@ -182,10 +278,10 @@ exports.searchPackages = async (req, res) => {
     });
 
     const destAddress = await Address.create({
-      street_name: destination.street_name,
-      house_number: destination.house_number,
-      extra_info: destination.extra_info,
-      postal_code: destination.postal_code,
+      street_name: destination_address.street_name,
+      house_number: destination_address.house_number,
+      extra_info: destination_address.extra_info,
+      postal_code: destination_address.postal_code,
     });
 
     // Update de courier met de nieuwe adressen
@@ -205,57 +301,14 @@ exports.searchPackages = async (req, res) => {
     console.log('Pending packages:', JSON.stringify(packages, null, 2));
 
     // Geocode de start- en bestemmingsadressen van de courier
-    const startPostalCodeData = await PostalCode.findByPk(startAddress.postal_code);
-    const destPostalCodeData = await PostalCode.findByPk(destAddress.postal_code);
-
-    const startAddressObj = {
-      street_name: startAddress.street_name,
-      house_number: startAddress.house_number,
-      extra_info: startAddress.extra_info,
-      city: startPostalCodeData.city,
-      postal_code: startAddress.postal_code,
-      country: startPostalCodeData.country,
-    };
-
-    const destAddressObj = {
-      street_name: destAddress.street_name,
-      house_number: destAddress.house_number,
-      extra_info: destAddress.extra_info,
-      city: destPostalCodeData.city,
-      postal_code: destAddress.postal_code,
-      country: destPostalCodeData.country,
-    };
-
-    const startCoords = await geocodeAddress(startAddressObj);
-    const destCoords = await geocodeAddress(destAddressObj);
+    const startCoords = await geocodeAddress(startAddress);
+    const destCoords = await geocodeAddress(destAddress);
 
     const matchingPackages = [];
     for (const pkg of packages) {
       try {
-        const pickupPostalCode = await PostalCode.findByPk(pkg.pickupAddress.postal_code);
-        const dropoffPostalCode = await PostalCode.findByPk(pkg.dropoffAddress.postal_code);
-
-        const pickupAddressObj = {
-          street_name: pkg.pickupAddress.street_name,
-          house_number: pkg.pickupAddress.house_number,
-          extra_info: pkg.pickupAddress.extra_info,
-          city: pickupPostalCode.city,
-          postal_code: pkg.pickupAddress.postal_code,
-          country: pickupPostalCode.country,
-        };
-
-        const dropoffAddressObj = {
-          street_name: pkg.dropoffAddress.street_name,
-          house_number: pkg.dropoffAddress.house_number,
-          extra_info: pkg.dropoffAddress.extra_info,
-          city: dropoffPostalCode.city,
-          postal_code: pkg.dropoffAddress.postal_code,
-          country: dropoffPostalCode.country,
-        };
-
-        // Geocode de pakketadressen
-        const pickupCoords = await geocodeAddress(pickupAddressObj);
-        const dropoffCoords = await geocodeAddress(dropoffAddressObj);
+        const pickupCoords = await geocodeAddress(pkg.pickupAddress);
+        const dropoffCoords = await geocodeAddress(pkg.dropoffAddress);
 
         // Bereken de afstanden
         const pickupDistance = haversineDistance(startCoords, pickupCoords);

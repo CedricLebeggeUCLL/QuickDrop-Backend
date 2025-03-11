@@ -23,11 +23,13 @@ const userRoutes = require('./routes/userRoutes');
 const packageRoutes = require('./routes/packageRoutes');
 const courierRoutes = require('./routes/courierRoutes');
 const deliveryRoutes = require('./routes/deliveryRoutes');
+const addressRoutes = require('./routes/addressRoutes');
 
 app.use('/api/users', userRoutes);
 app.use('/api/packages', packageRoutes);
 app.use('/api/couriers', courierRoutes);
 app.use('/api/deliveries', deliveryRoutes);
+app.use('/api/addresses', addressRoutes);
 
 // Start de server
 app.listen(port, '0.0.0.0', () => {
