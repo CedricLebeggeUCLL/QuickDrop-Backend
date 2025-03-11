@@ -227,6 +227,10 @@ exports.searchPackages = async (req, res) => {
     return res.status(400).json({ error: 'City and country are required for both start and destination addresses' });
   }
 
+  // Zorg ervoor dat extra_info altijd null is als het undefined is
+  start_address.extra_info = start_address.extra_info !== undefined ? start_address.extra_info : null;
+  destination_address.extra_info = destination_address.extra_info !== undefined ? destination_address.extra_info : null;
+
   try {
     // Haal de courier op
     const courier = await Courier.findOne({
@@ -250,7 +254,7 @@ exports.searchPackages = async (req, res) => {
       startAddressData = {
         street_name: courier.currentAddress.street_name,
         house_number: courier.currentAddress.house_number,
-        extra_info: courier.currentAddress.extra_info || null, // Fallback voor undefined
+        extra_info: courier.currentAddress.extra_info || null,
         postal_code: courier.currentAddress.postal_code,
         city: start_address.city,
         country: start_address.country,
@@ -262,7 +266,7 @@ exports.searchPackages = async (req, res) => {
       where: {
         street_name: startAddressData.street_name,
         house_number: startAddressData.house_number,
-        extra_info: startAddressData.extra_info, // Kan null zijn
+        extra_info: startAddressData.extra_info, // Nu gegarandeerd null of een string
         postal_code: startAddressData.postal_code,
       },
     });
@@ -270,7 +274,7 @@ exports.searchPackages = async (req, res) => {
       startAddress = await Address.create({
         street_name: startAddressData.street_name,
         house_number: startAddressData.house_number,
-        extra_info: startAddressData.extra_info, // Kan null zijn
+        extra_info: startAddressData.extra_info,
         postal_code: startAddressData.postal_code,
       });
     }
@@ -280,7 +284,7 @@ exports.searchPackages = async (req, res) => {
       where: {
         street_name: destination_address.street_name,
         house_number: destination_address.house_number,
-        extra_info: destination_address.extra_info || null, // Fallback voor undefined
+        extra_info: destination_address.extra_info, // Nu gegarandeerd null of een string
         postal_code: destination_address.postal_code,
       },
     });
@@ -288,7 +292,7 @@ exports.searchPackages = async (req, res) => {
       destAddress = await Address.create({
         street_name: destination_address.street_name,
         house_number: destination_address.house_number,
-        extra_info: destination_address.extra_info || null, // Kan null zijn
+        extra_info: destination_address.extra_info,
         postal_code: destination_address.postal_code,
       });
     }
