@@ -217,7 +217,7 @@ exports.searchPackages = async (req, res) => {
   const userId = req.body.user_id;
   const { start_address, destination_address, pickup_radius, dropoff_radius, use_current_as_start } = req.body;
 
-  console.log('Request body:', req.body);
+  console.log('Request body received:', JSON.stringify(req.body, null, 2));
 
   if (!pickup_radius || !dropoff_radius) {
     return res.status(400).json({ error: 'Pickup radius and dropoff radius are required' });
@@ -250,7 +250,7 @@ exports.searchPackages = async (req, res) => {
       startAddressData = {
         street_name: courier.currentAddress.street_name,
         house_number: courier.currentAddress.house_number,
-        extra_info: courier.currentAddress.extra_info,
+        extra_info: courier.currentAddress.extra_info || null, // Fallback voor undefined
         postal_code: courier.currentAddress.postal_code,
         city: start_address.city,
         country: start_address.country,
@@ -262,7 +262,7 @@ exports.searchPackages = async (req, res) => {
       where: {
         street_name: startAddressData.street_name,
         house_number: startAddressData.house_number,
-        extra_info: startAddressData.extra_info,
+        extra_info: startAddressData.extra_info, // Kan null zijn
         postal_code: startAddressData.postal_code,
       },
     });
@@ -270,7 +270,7 @@ exports.searchPackages = async (req, res) => {
       startAddress = await Address.create({
         street_name: startAddressData.street_name,
         house_number: startAddressData.house_number,
-        extra_info: startAddressData.extra_info,
+        extra_info: startAddressData.extra_info, // Kan null zijn
         postal_code: startAddressData.postal_code,
       });
     }
@@ -280,7 +280,7 @@ exports.searchPackages = async (req, res) => {
       where: {
         street_name: destination_address.street_name,
         house_number: destination_address.house_number,
-        extra_info: destination_address.extra_info,
+        extra_info: destination_address.extra_info || null, // Fallback voor undefined
         postal_code: destination_address.postal_code,
       },
     });
@@ -288,7 +288,7 @@ exports.searchPackages = async (req, res) => {
       destAddress = await Address.create({
         street_name: destination_address.street_name,
         house_number: destination_address.house_number,
-        extra_info: destination_address.extra_info,
+        extra_info: destination_address.extra_info || null, // Kan null zijn
         postal_code: destination_address.postal_code,
       });
     }
@@ -357,6 +357,7 @@ exports.searchPackages = async (req, res) => {
 
     res.json({ message: 'Packages found', packages: matchingPackages });
   } catch (err) {
+    console.error('Search packages error:', err);
     res.status(500).json({ error: 'Error searching packages', details: err.message });
   }
 };
