@@ -245,6 +245,7 @@ exports.searchPackages = async (req, res) => {
       return res.status(403).json({ error: 'User is not a courier' });
     }
 
+    // Verwerk startadres
     let startAddressData = { ...start_address, country: 'Belgium' };
     if (use_current_as_start && courier.currentAddress) {
       startAddressData = {
@@ -265,8 +266,15 @@ exports.searchPackages = async (req, res) => {
         postal_code: startAddressData.postal_code,
       },
     });
+
+    console.log('Start address from DB:', startAddress ? startAddress.toJSON() : 'Not found');
+
     if (!startAddress) {
       const startCoords = await geocodeAddress(startAddressData);
+      console.log('Geocoded start address:', startCoords);
+      if (!startCoords || !startCoords.lat || !startCoords.lng) {
+        throw new Error('Failed to geocode start address: No coordinates returned');
+      }
       startAddress = await Address.create({
         street_name: startAddressData.street_name,
         house_number: startAddressData.house_number,
@@ -275,8 +283,18 @@ exports.searchPackages = async (req, res) => {
         lat: startCoords.lat,
         lng: startCoords.lng,
       }, { transaction });
+      console.log('Created start address:', startAddress.toJSON());
+    } else if (!startAddress.lat || !startAddress.lng) {
+      const startCoords = await geocodeAddress(startAddressData);
+      console.log('Updating start address with coords:', startCoords);
+      if (!startCoords || !startCoords.lat || !startCoords.lng) {
+        throw new Error('Failed to update start address: No coordinates returned');
+      }
+      await startAddress.update({ lat: startCoords.lat, lng: startCoords.lng }, { transaction });
+      console.log('Updated start address:', startAddress.toJSON());
     }
 
+    // Verwerk bestemmingsadres
     let destAddressData = { ...destination_address, country: 'Belgium' };
     let destAddress = await Address.findOne({
       where: {
@@ -286,8 +304,15 @@ exports.searchPackages = async (req, res) => {
         postal_code: destAddressData.postal_code,
       },
     });
+
+    console.log('Destination address from DB:', destAddress ? destAddress.toJSON() : 'Not found');
+
     if (!destAddress) {
       const destCoords = await geocodeAddress(destAddressData);
+      console.log('Geocoded destination address:', destCoords);
+      if (!destCoords || !destCoords.lat || !destCoords.lng) {
+        throw new Error('Failed to geocode destination address: No coordinates returned');
+      }
       destAddress = await Address.create({
         street_name: destAddressData.street_name,
         house_number: destAddressData.house_number,
@@ -296,8 +321,18 @@ exports.searchPackages = async (req, res) => {
         lat: destCoords.lat,
         lng: destCoords.lng,
       }, { transaction });
+      console.log('Created destination address:', destAddress.toJSON());
+    } else if (!destAddress.lat || !destAddress.lng) {
+      const destCoords = await geocodeAddress(destAddressData);
+      console.log('Updating destination address with coords:', destCoords);
+      if (!destCoords || !destCoords.lat || !destCoords.lng) {
+        throw new Error('Failed to update destination address: No coordinates returned');
+      }
+      await destAddress.update({ lat: destCoords.lat, lng: destCoords.lng }, { transaction });
+      console.log('Updated destination address:', destAddress.toJSON());
     }
 
+    // Postcodes toevoegen
     const startPostalCode = await PostalCode.findByPk(startAddressData.postal_code);
     if (!startPostalCode) {
       await PostalCode.create({
@@ -316,11 +351,13 @@ exports.searchPackages = async (req, res) => {
       }, { transaction });
     }
 
+    // Update koerier
     await courier.update({
       start_address_id: startAddress.id,
       destination_address_id: destAddress.id,
     }, { transaction });
 
+    // Haal pakketten op
     const packages = await Package.findAll({
       where: { status: 'pending' },
       include: [
@@ -333,6 +370,11 @@ exports.searchPackages = async (req, res) => {
 
     const matchingPackages = [];
     for (const pkg of packages) {
+      if (!pkg.pickupAddress.lat || !pkg.pickupAddress.lng || !pkg.dropoffAddress.lat || !pkg.dropoffAddress.lng) {
+        console.error(`Package ${pkg.id} has missing coordinates, skipping`);
+        continue;
+      }
+
       const pickupCoords = { lat: pkg.pickupAddress.lat, lng: pkg.pickupAddress.lng };
       const dropoffCoords = { lat: pkg.dropoffAddress.lat, lng: pkg.dropoffAddress.lng };
       const startCoords = { lat: startAddress.lat, lng: startAddress.lng };
@@ -341,9 +383,7 @@ exports.searchPackages = async (req, res) => {
       const pickupDistance = haversineDistance(startCoords, pickupCoords);
       const dropoffDistance = haversineDistance(destCoords, dropoffCoords);
 
-      console.log(`Package ID ${pkg.id}: Start = ${JSON.stringify(startCoords)}, Pickup = ${JSON.stringify(pickupCoords)}, Pickup Distance = ${pickupDistance} km`);
-      console.log(`Package ID ${pkg.id}: Dest = ${JSON.stringify(destCoords)}, Dropoff = ${JSON.stringify(dropoffCoords)}, Dropoff Distance = ${dropoffDistance} km`);
-      console.log(`Package ID ${pkg.id}: Pickup Radius = ${pickup_radius}, Dropoff Radius = ${dropoff_radius}, Match = ${pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius}`);
+      console.log(`Package ${pkg.id}: Pickup Distance = ${pickupDistance} km, Dropoff Distance = ${dropoffDistance} km`);
 
       if (pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius) {
         matchingPackages.push(pkg);
