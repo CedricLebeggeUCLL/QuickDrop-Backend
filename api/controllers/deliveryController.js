@@ -36,74 +36,46 @@ exports.getDeliveryById = async (req, res) => {
 };
 
 exports.createDelivery = async (req, res) => {
-  const userId = req.body.user_id;
-  const { package_id, start_address, destination_address, pickup_radius, dropoff_radius } = req.body;
+  console.log('Entering createDelivery endpoint');
+  const { user_id, package_id } = req.body;
+
+  console.log('Create delivery request received:', JSON.stringify(req.body, null, 2));
 
   const transaction = await sequelize.transaction();
   try {
-    const courier = await Courier.findOne({ where: { user_id: userId }, transaction });
+    // Controleer koerier
+    console.log('Finding courier with user_id:', user_id);
+    const courier = await Courier.findOne({ where: { user_id }, transaction });
     if (!courier) {
+      console.log('Courier not found for user_id:', user_id);
       await transaction.rollback();
       return res.status(403).json({ error: 'User is not a courier' });
     }
+    console.log('Courier found:', courier.toJSON());
 
-    const package = await Package.findByPk(package_id, { transaction });
+    // Controleer pakket
+    console.log('Finding package with package_id:', package_id);
+    const package = await Package.findByPk(package_id, {
+      include: [
+        { model: Address, as: 'pickupAddress' },
+        { model: Address, as: 'dropoffAddress' },
+      ],
+      transaction,
+    });
     if (!package) {
+      console.log('Package not found for package_id:', package_id);
       await transaction.rollback();
       return res.status(404).json({ error: 'Package not found' });
     }
-
-    // Geocode adressen voor afstandsberekening
-    const startAddressObj = start_address || (await Address.findByPk(courier.start_address_id));
-    const destAddressObj = destination_address || (await Address.findByPk(courier.destination_address_id));
-    const pickupAddressObj = await Address.findByPk(package.pickup_address_id);
-    const dropoffAddressObj = await Address.findByPk(package.dropoff_address_id);
-
-    const startCoords = await geocodeAddress(startAddressObj);
-    const destCoords = await geocodeAddress(destAddressObj);
-    const pickupCoords = await geocodeAddress(pickupAddressObj);
-    const dropoffCoords = await geocodeAddress(dropoffAddressObj);
-
-    const pickupDistance = haversineDistance(startCoords, pickupCoords);
-    const dropoffDistance = haversineDistance(destCoords, dropoffCoords);
-    const effectivePickupRadius = pickup_radius || courier.pickup_radius;
-    const effectiveDropoffRadius = dropoff_radius || courier.dropoff_radius;
-
-    if (pickupDistance > effectivePickupRadius || dropoffDistance > effectiveDropoffRadius) {
+    console.log('Package found:', package.toJSON());
+    if (package.status !== 'pending') {
+      console.log('Package is not pending, current status:', package.status);
       await transaction.rollback();
-      return res.status(400).json({ error: 'Package is outside the specified radii' });
+      return res.status(400).json({ error: 'Package is not available for assignment' });
     }
 
-    // Update courier adressen indien nieuwe adressen zijn meegegeven
-    if (start_address) {
-      const [startAddress] = await Address.findOrCreate({
-        where: {
-          street_name: start_address.street_name,
-          house_number: start_address.house_number,
-          extra_info: start_address.extra_info || null,
-          postal_code: start_address.postal_code,
-        },
-        defaults: start_address,
-        transaction,
-      });
-      await courier.update({ start_address_id: startAddress.id }, { transaction });
-    }
-
-    if (destination_address) {
-      const [destAddress] = await Address.findOrCreate({
-        where: {
-          street_name: destination_address.street_name,
-          house_number: destination_address.house_number,
-          extra_info: destination_address.extra_info || null,
-          postal_code: destination_address.postal_code,
-        },
-        defaults: destination_address,
-        transaction,
-      });
-      await courier.update({ destination_address_id: destAddress.id }, { transaction });
-    }
-
-    // Maak een nieuwe Delivery
+    // Maak delivery aan
+    console.log('Creating delivery...');
     const delivery = await Delivery.create({
       package_id: package.id,
       courier_id: courier.id,
@@ -111,12 +83,19 @@ exports.createDelivery = async (req, res) => {
       dropoff_address_id: package.dropoff_address_id,
       status: 'assigned',
     }, { transaction });
+    console.log('Delivery created:', delivery.toJSON());
 
-    await Package.update({ status: 'in_transit' }, { where: { id: package.id }, transaction });
+    // Update pakketstatus
+    console.log('Updating package status to assigned...');
+    await package.update({ status: 'assigned' }, { transaction });
+    console.log('Package updated:', package.toJSON());
+
     await transaction.commit();
+    console.log('Transaction committed');
     res.status(201).json({ message: 'Delivery created successfully', deliveryId: delivery.id });
   } catch (err) {
     await transaction.rollback();
+    console.error('Create delivery error:', err);
     res.status(500).json({ error: 'Error creating delivery', details: err.message });
   }
 };
