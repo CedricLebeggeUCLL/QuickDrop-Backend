@@ -227,12 +227,11 @@ exports.searchPackages = async (req, res) => {
     return res.status(400).json({ error: 'City and country are required for both start and destination addresses' });
   }
 
-  // Zorg ervoor dat extra_info altijd null is als het undefined is
   start_address.extra_info = start_address.extra_info !== undefined ? start_address.extra_info : null;
   destination_address.extra_info = destination_address.extra_info !== undefined ? destination_address.extra_info : null;
 
+  const transaction = await sequelize.transaction();
   try {
-    // Haal de courier op
     const courier = await Courier.findOne({
       where: { user_id: userId },
       include: [
@@ -241,15 +240,12 @@ exports.searchPackages = async (req, res) => {
         { model: Address, as: 'destinationAddress' },
       ],
     });
-    if (!courier) return res.status(403).json({ error: 'User is not a courier' });
-
-    // Controleer of de courier een start- en bestemmingsadres heeft
-    if (!courier.start_address_id || !courier.destination_address_id) {
-      return res.status(400).json({ error: 'Courier must have a start and destination address set' });
+    if (!courier) {
+      await transaction.rollback();
+      return res.status(403).json({ error: 'User is not a courier' });
     }
 
-    // Maak nieuwe adressen aan vanuit het verzoek, maar controleer op duplicaten
-    let startAddressData = start_address;
+    let startAddressData = { ...start_address, country: 'Belgium' };
     if (use_current_as_start && courier.currentAddress) {
       startAddressData = {
         street_name: courier.currentAddress.street_name,
@@ -257,70 +253,73 @@ exports.searchPackages = async (req, res) => {
         extra_info: courier.currentAddress.extra_info || null,
         postal_code: courier.currentAddress.postal_code,
         city: start_address.city,
-        country: start_address.country,
+        country: 'Belgium',
       };
     }
 
-    // Controleer of het startadres al bestaat
     let startAddress = await Address.findOne({
       where: {
         street_name: startAddressData.street_name,
         house_number: startAddressData.house_number,
-        extra_info: startAddressData.extra_info, // Nu gegarandeerd null of een string
+        extra_info: startAddressData.extra_info,
         postal_code: startAddressData.postal_code,
       },
     });
     if (!startAddress) {
+      const startCoords = await geocodeAddress(startAddressData);
       startAddress = await Address.create({
         street_name: startAddressData.street_name,
         house_number: startAddressData.house_number,
         extra_info: startAddressData.extra_info,
         postal_code: startAddressData.postal_code,
-      });
+        lat: startCoords.lat,
+        lng: startCoords.lng,
+      }, { transaction });
     }
 
-    // Controleer of het bestemmingsadres al bestaat
+    let destAddressData = { ...destination_address, country: 'Belgium' };
     let destAddress = await Address.findOne({
       where: {
-        street_name: destination_address.street_name,
-        house_number: destination_address.house_number,
-        extra_info: destination_address.extra_info, // Nu gegarandeerd null of een string
-        postal_code: destination_address.postal_code,
+        street_name: destAddressData.street_name,
+        house_number: destAddressData.house_number,
+        extra_info: destAddressData.extra_info,
+        postal_code: destAddressData.postal_code,
       },
     });
     if (!destAddress) {
+      const destCoords = await geocodeAddress(destAddressData);
       destAddress = await Address.create({
-        street_name: destination_address.street_name,
-        house_number: destination_address.house_number,
-        extra_info: destination_address.extra_info,
-        postal_code: destination_address.postal_code,
-      });
+        street_name: destAddressData.street_name,
+        house_number: destAddressData.house_number,
+        extra_info: destAddressData.extra_info,
+        postal_code: destAddressData.postal_code,
+        lat: destCoords.lat,
+        lng: destCoords.lng,
+      }, { transaction });
     }
 
-    // Controleer of de opgegeven postcode bestaat, zo niet, voeg toe
     const startPostalCode = await PostalCode.findByPk(startAddressData.postal_code);
     if (!startPostalCode) {
       await PostalCode.create({
         code: startAddressData.postal_code,
         city: startAddressData.city,
-        country: startAddressData.country,
-      });
+        country: 'Belgium',
+      }, { transaction });
     }
 
-    const destPostalCode = await PostalCode.findByPk(destination_address.postal_code);
+    const destPostalCode = await PostalCode.findByPk(destAddressData.postal_code);
     if (!destPostalCode) {
       await PostalCode.create({
-        code: destination_address.postal_code,
-        city: destination_address.city,
-        country: destination_address.country,
-      });
+        code: destAddressData.postal_code,
+        city: destAddressData.city,
+        country: 'Belgium',
+      }, { transaction });
     }
 
-    // Update de courier met de bestaande of nieuwe adressen
     await courier.update({
       start_address_id: startAddress.id,
       destination_address_id: destAddress.id,
-    });
+    }, { transaction });
 
     const packages = await Package.findAll({
       where: { status: 'pending' },
@@ -332,36 +331,32 @@ exports.searchPackages = async (req, res) => {
 
     console.log('Pending packages:', JSON.stringify(packages, null, 2));
 
-    // Geocode de start- en bestemmingsadressen van de courier
-    const startCoords = await geocodeAddress(startAddress);
-    const destCoords = await geocodeAddress(destAddress);
-
     const matchingPackages = [];
     for (const pkg of packages) {
-      try {
-        const pickupCoords = await geocodeAddress(pkg.pickupAddress);
-        const dropoffCoords = await geocodeAddress(pkg.dropoffAddress);
+      const pickupCoords = { lat: pkg.pickupAddress.lat, lng: pkg.pickupAddress.lng };
+      const dropoffCoords = { lat: pkg.dropoffAddress.lat, lng: pkg.dropoffAddress.lng };
+      const startCoords = { lat: startAddress.lat, lng: startAddress.lng };
+      const destCoords = { lat: destAddress.lat, lng: destAddress.lng };
 
-        // Bereken de afstanden
-        const pickupDistance = haversineDistance(startCoords, pickupCoords);
-        const dropoffDistance = haversineDistance(destCoords, dropoffCoords);
+      const pickupDistance = haversineDistance(startCoords, pickupCoords);
+      const dropoffDistance = haversineDistance(destCoords, dropoffCoords);
 
-        console.log(`Package ID ${pkg.id}: Start = ${JSON.stringify(startCoords)}, Pickup = ${JSON.stringify(pickupCoords)}, Pickup Distance = ${pickupDistance} km`);
-        console.log(`Package ID ${pkg.id}: Dest = ${JSON.stringify(destCoords)}, Dropoff = ${JSON.stringify(dropoffCoords)}, Dropoff Distance = ${dropoffDistance} km`);
-        console.log(`Package ID ${pkg.id}: Pickup Radius = ${pickup_radius}, Dropoff Radius = ${dropoff_radius}, Match = ${pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius}`);
+      console.log(`Package ID ${pkg.id}: Start = ${JSON.stringify(startCoords)}, Pickup = ${JSON.stringify(pickupCoords)}, Pickup Distance = ${pickupDistance} km`);
+      console.log(`Package ID ${pkg.id}: Dest = ${JSON.stringify(destCoords)}, Dropoff = ${JSON.stringify(dropoffCoords)}, Dropoff Distance = ${dropoffDistance} km`);
+      console.log(`Package ID ${pkg.id}: Pickup Radius = ${pickup_radius}, Dropoff Radius = ${dropoff_radius}, Match = ${pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius}`);
 
-        if (pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius) {
-          matchingPackages.push(pkg);
-        }
-      } catch (error) {
-        console.error(`Error processing package ID ${pkg.id}:`, error.message);
-        continue; // Sla pakket over bij geocoding-fouten
+      if (pickupDistance <= pickup_radius && dropoffDistance <= dropoff_radius) {
+        matchingPackages.push(pkg);
       }
     }
 
+    await transaction.commit();
     res.json({ message: 'Packages found', packages: matchingPackages });
   } catch (err) {
+    await transaction.rollback();
     console.error('Search packages error:', err);
     res.status(500).json({ error: 'Error searching packages', details: err.message });
   }
 };
+
+module.exports = exports;

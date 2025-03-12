@@ -27,6 +27,14 @@ const Address = sequelize.define('Address', {
       key: 'code',
     },
   },
+  lat: {
+    type: DataTypes.DECIMAL(10, 7),
+    allowNull: true,
+  },
+  lng: {
+    type: DataTypes.DECIMAL(10, 7),
+    allowNull: true,
+  },
 }, {
   tableName: 'addresses',
   timestamps: false,

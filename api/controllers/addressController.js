@@ -1,6 +1,7 @@
 const { sequelize } = require('../db');
 const Address = require('../models/address');
 const PostalCode = require('../models/postalcode');
+const { geocodeAddress } = require('../../utils/geocode'); // Veronderstel dat geocode in utils-map staat
 
 exports.getAddresses = async (req, res) => {
   try {
@@ -26,7 +27,7 @@ exports.getAddressById = async (req, res) => {
 };
 
 exports.createAddress = async (req, res) => {
-  const { street_name, house_number, extra_info, postal_code } = req.body;
+  const { street_name, house_number, extra_info, postal_code, city, country } = req.body;
 
   if (!street_name || !house_number || !postal_code) {
     return res.status(400).json({ error: 'Street name, house number, and postal code are required' });
@@ -34,24 +35,38 @@ exports.createAddress = async (req, res) => {
 
   const transaction = await sequelize.transaction();
   try {
-    const postalCodeRecord = await PostalCode.findByPk(postal_code);
+    // Controleer of de postcode bestaat, anders maak een nieuwe aan
+    let postalCodeRecord = await PostalCode.findByPk(postal_code);
     if (!postalCodeRecord) {
-      await PostalCode.create({
+      postalCodeRecord = await PostalCode.create({
         code: postal_code,
-        city: req.body.city || 'Unknown',
-        country: req.body.country || 'Unknown',
+        city: city || 'Unknown',
+        country: country || 'Unknown',
       }, { transaction });
     }
 
+    // Geocode het adres om coördinaten te krijgen
+    const coordinates = await geocodeAddress({
+      street_name,
+      house_number,
+      extra_info: extra_info || null,
+      postal_code,
+      city: postalCodeRecord.city,
+      country: postalCodeRecord.country,
+    });
+
+    // Maak het adres aan met coördinaten
     const address = await Address.create({
       street_name,
       house_number,
       extra_info: extra_info || null,
       postal_code,
+      lat: coordinates.lat,
+      lng: coordinates.lng,
     }, { transaction });
 
     await transaction.commit();
-    res.status(201).json({ message: 'Address created successfully', addressId: address.id });
+    res.status(201).json({ message: 'Address created successfully', addressId: address.id, lat: coordinates.lat, lng: coordinates.lng });
   } catch (err) {
     await transaction.rollback();
     res.status(500).json({ error: 'Error creating address', details: err.message });
@@ -59,13 +74,49 @@ exports.createAddress = async (req, res) => {
 };
 
 exports.updateAddress = async (req, res) => {
-  const { street_name, house_number, extra_info, postal_code } = req.body;
+  const { street_name, house_number, extra_info, postal_code, city, country } = req.body;
   const transaction = await sequelize.transaction();
   try {
+    const address = await Address.findByPk(req.params.id, { transaction });
+    if (!address) {
+      await transaction.rollback();
+      return res.status(404).json({ error: 'Address not found' });
+    }
+
+    // Update postcode als deze verandert
+    if (postal_code && address.postal_code !== postal_code) {
+      let postalCodeRecord = await PostalCode.findByPk(postal_code);
+      if (!postalCodeRecord) {
+        postalCodeRecord = await PostalCode.create({
+          code: postal_code,
+          city: city || 'Unknown',
+          country: country || 'Unknown',
+        }, { transaction });
+      }
+    }
+
+    // Geocode opnieuw als het adres verandert
+    const coordinates = await geocodeAddress({
+      street_name: street_name || address.street_name,
+      house_number: house_number || address.house_number,
+      extra_info: extra_info || address.extra_info || null,
+      postal_code: postal_code || address.postal_code,
+      city: (await PostalCode.findByPk(postal_code || address.postal_code)).city,
+      country: (await PostalCode.findByPk(postal_code || address.postal_code)).country,
+    });
+
     const [updated] = await Address.update(
-      { street_name, house_number, extra_info: extra_info || null, postal_code },
+      {
+        street_name: street_name || address.street_name,
+        house_number: house_number || address.house_number,
+        extra_info: extra_info || address.extra_info || null,
+        postal_code: postal_code || address.postal_code,
+        lat: coordinates.lat,
+        lng: coordinates.lng,
+      },
       { where: { id: req.params.id }, transaction }
     );
+
     if (updated === 0) {
       await transaction.rollback();
       return res.status(404).json({ error: 'Address not found' });
