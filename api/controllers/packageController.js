@@ -17,6 +17,7 @@ exports.getPackages = async (req, res) => {
     });
     res.json(packages);
   } catch (err) {
+    console.error('Error fetching packages:', err.message);
     res.status(500).json({ error: 'Error fetching packages', details: err.message });
   }
 };
@@ -32,7 +33,28 @@ exports.getPackageById = async (req, res) => {
     if (!packageItem) return res.status(404).json({ error: 'Package not found' });
     res.json(packageItem);
   } catch (err) {
+    console.error('Error fetching package:', err.message);
     res.status(500).json({ error: 'Error fetching package', details: err.message });
+  }
+};
+
+exports.getPackagesByUserId = async (req, res) => {
+  try {
+    const userId = req.params.userId;
+    if (!userId || userId <= 0) {
+      return res.status(400).json({ error: 'Invalid user_id' });
+    }
+    const packages = await Package.findAll({
+      where: { user_id: userId },
+      include: [
+        { model: Address, as: 'pickupAddress' },
+        { model: Address, as: 'dropoffAddress' },
+      ],
+    });
+    res.json(packages);
+  } catch (err) {
+    console.error('Error fetching packages by user ID:', err.message);
+    res.status(500).json({ error: 'Error fetching packages by user ID', details: err.message });
   }
 };
 
@@ -59,7 +81,6 @@ exports.addPackage = async (req, res) => {
       return res.status(403).json({ error: 'User does not exist' });
     }
 
-    // Functie om postcode toe te voegen
     const processPostalCode = async (address) => {
       if (address.postal_code) {
         const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code } });
@@ -81,14 +102,9 @@ exports.addPackage = async (req, res) => {
       }
     };
 
-    // Voeg pickup-address postcode toe
     await processPostalCode(pickup_address);
-
-    // Voeg dropoff-address postcode toe
     await processPostalCode(dropoff_address);
 
-    // Maak pickup-adres
-    console.log('Creating pickup address:', pickup_address);
     const pickupCoords = await geocodeAddress(pickup_address);
     if (!pickupCoords.lat || !pickupCoords.lng) {
       console.log('Geocoding failed for pickup address:', pickupCoords);
@@ -105,10 +121,8 @@ exports.addPackage = async (req, res) => {
       defaults: { ...pickup_address, lat: pickupCoords.lat, lng: pickupCoords.lng },
       transaction,
     });
-    console.log('Pickup address created:', pickupAddress.toJSON());
+    console.log('Pickup address created/updated:', pickupAddress.toJSON());
 
-    // Maak dropoff-adres
-    console.log('Creating dropoff address:', dropoff_address);
     const dropoffCoords = await geocodeAddress(dropoff_address);
     if (!dropoffCoords.lat || !dropoffCoords.lng) {
       console.log('Geocoding failed for dropoff address:', dropoffCoords);
@@ -125,10 +139,8 @@ exports.addPackage = async (req, res) => {
       defaults: { ...dropoff_address, lat: dropoffCoords.lat, lng: dropoffCoords.lng },
       transaction,
     });
-    console.log('Dropoff address created:', dropoffAddress.toJSON());
+    console.log('Dropoff address created/updated:', dropoffAddress.toJSON());
 
-    // Maak pakket aan
-    console.log('Creating package...');
     const packageItem = await Package.create({
       user_id: userId,
       description,
@@ -143,6 +155,7 @@ exports.addPackage = async (req, res) => {
     res.status(201).json({ message: 'Package added successfully', packageId: packageItem.id });
   } catch (err) {
     await transaction.rollback();
+    console.error('Error adding package:', err.message);
     if (err.name === 'SequelizeForeignKeyConstraintError') {
       res.status(403).json({ error: 'User or postal code does not exist', details: err.message });
     } else {
@@ -247,7 +260,7 @@ exports.updatePackage = async (req, res) => {
       description,
       ...(pickupAddressId && { pickup_address_id: pickupAddressId }),
       ...(dropoffAddressId && { dropoff_address_id: dropoffAddressId }),
-      status,
+      ...(status && { status }), // Alleen updaten als status is meegegeven
     };
 
     const [updated] = await Package.update(
@@ -268,9 +281,11 @@ exports.updatePackage = async (req, res) => {
     });
 
     await transaction.commit();
+    console.log('Package updated:', updatedPackage.toJSON());
     res.json(updatedPackage);
   } catch (err) {
     await transaction.rollback();
+    console.error('Error updating package:', err.message);
     res.status(500).json({ error: 'Error updating package', details: err.message });
   }
 };
@@ -279,8 +294,10 @@ exports.deletePackage = async (req, res) => {
   try {
     const deleted = await Package.destroy({ where: { id: req.params.id } });
     if (deleted === 0) return res.status(404).json({ error: 'Package not found' });
+    console.log(`Package with id ${req.params.id} deleted`);
     res.status(204).send();
   } catch (err) {
+    console.error('Error deleting package:', err.message);
     res.status(500).json({ error: 'Error deleting package', details: err.message });
   }
 };
@@ -298,13 +315,14 @@ exports.trackPackage = async (req, res) => {
     if (!packageItem) {
       return res.status(404).json({ error: 'Package not found' });
     }
+
     if (packageItem.status !== 'in_transit') {
       return res.status(400).json({ error: 'Package is not in transit' });
     }
 
     const delivery = await Delivery.findOne({ where: { package_id: packageId } });
     if (!delivery) {
-      return res.status(404).json({ error: 'Delivery not found' });
+      return res.status(404).json({ error: 'Delivery not found for this package' });
     }
 
     const courier = await Courier.findByPk(delivery.courier_id, {
@@ -314,10 +332,22 @@ exports.trackPackage = async (req, res) => {
       return res.status(404).json({ error: 'Courier not found' });
     }
 
-    // Geocode het huidige adres van de courier voor tracking
-    const currentCoords = await geocodeAddress(courier.currentAddress);
-    res.json({ packageId, currentLocation: currentCoords });
+    const currentCoords = courier.currentAddress
+      ? await geocodeAddress(courier.currentAddress)
+      : { lat: null, lng: null };
+
+    const trackingInfo = {
+      packageId: packageItem.id,
+      status: packageItem.status,
+      pickupAddress: packageItem.pickupAddress,
+      dropoffAddress: packageItem.dropoffAddress,
+      currentLocation: currentCoords,
+      estimatedDelivery: delivery.delivery_time || 'Niet beschikbaar',
+    };
+
+    res.json(trackingInfo);
   } catch (err) {
+    console.error('Error tracking package:', err.message);
     res.status(500).json({ error: 'Error tracking package', details: err.message });
   }
 };
@@ -354,7 +384,6 @@ exports.searchPackages = async (req, res) => {
       return res.status(403).json({ error: 'User is not a courier' });
     }
 
-    // Verwerk startadres
     let startAddressData = { ...start_address, country: 'Belgium' };
     if (use_current_as_start && courier.currentAddress) {
       startAddressData = {
@@ -376,11 +405,8 @@ exports.searchPackages = async (req, res) => {
       },
     });
 
-    console.log('Start address from DB:', startAddress ? startAddress.toJSON() : 'Not found');
-
     if (!startAddress) {
       const startCoords = await geocodeAddress(startAddressData);
-      console.log('Geocoded start address:', startCoords);
       if (!startCoords || !startCoords.lat || !startCoords.lng) {
         throw new Error('Failed to geocode start address: No coordinates returned');
       }
@@ -392,18 +418,14 @@ exports.searchPackages = async (req, res) => {
         lat: startCoords.lat,
         lng: startCoords.lng,
       }, { transaction });
-      console.log('Created start address:', startAddress.toJSON());
     } else if (!startAddress.lat || !startAddress.lng) {
       const startCoords = await geocodeAddress(startAddressData);
-      console.log('Updating start address with coords:', startCoords);
       if (!startCoords || !startCoords.lat || !startCoords.lng) {
         throw new Error('Failed to update start address: No coordinates returned');
       }
       await startAddress.update({ lat: startCoords.lat, lng: startCoords.lng }, { transaction });
-      console.log('Updated start address:', startAddress.toJSON());
     }
 
-    // Verwerk bestemmingsadres
     let destAddressData = { ...destination_address, country: 'Belgium' };
     let destAddress = await Address.findOne({
       where: {
@@ -414,11 +436,8 @@ exports.searchPackages = async (req, res) => {
       },
     });
 
-    console.log('Destination address from DB:', destAddress ? destAddress.toJSON() : 'Not found');
-
     if (!destAddress) {
       const destCoords = await geocodeAddress(destAddressData);
-      console.log('Geocoded destination address:', destCoords);
       if (!destCoords || !destCoords.lat || !destCoords.lng) {
         throw new Error('Failed to geocode destination address: No coordinates returned');
       }
@@ -430,18 +449,14 @@ exports.searchPackages = async (req, res) => {
         lat: destCoords.lat,
         lng: destCoords.lng,
       }, { transaction });
-      console.log('Created destination address:', destAddress.toJSON());
     } else if (!destAddress.lat || !destAddress.lng) {
       const destCoords = await geocodeAddress(destAddressData);
-      console.log('Updating destination address with coords:', destCoords);
       if (!destCoords || !destCoords.lat || !destCoords.lng) {
         throw new Error('Failed to update destination address: No coordinates returned');
       }
       await destAddress.update({ lat: destCoords.lat, lng: destCoords.lng }, { transaction });
-      console.log('Updated destination address:', destAddress.toJSON());
     }
 
-    // Voeg nieuwe postcodes toe
     const processPostalCode = async (addressData) => {
       if (addressData.postal_code) {
         const postalCodeExists = await PostalCode.findOne({ where: { code: addressData.postal_code } });
@@ -462,13 +477,11 @@ exports.searchPackages = async (req, res) => {
     await processPostalCode(startAddressData);
     await processPostalCode(destAddressData);
 
-    // Update koerier
     await courier.update({
       start_address_id: startAddress.id,
       destination_address_id: destAddress.id,
     }, { transaction });
 
-    // Haal pakketten op
     const packages = await Package.findAll({
       where: { status: 'pending' },
       include: [
@@ -476,8 +489,6 @@ exports.searchPackages = async (req, res) => {
         { model: Address, as: 'dropoffAddress' },
       ],
     });
-
-    console.log('Pending packages:', JSON.stringify(packages, null, 2));
 
     const matchingPackages = [];
     for (const pkg of packages) {
@@ -505,7 +516,7 @@ exports.searchPackages = async (req, res) => {
     res.json({ message: 'Packages found', packages: matchingPackages });
   } catch (err) {
     await transaction.rollback();
-    console.error('Search packages error:', err);
+    console.error('Search packages error:', err.message);
     res.status(500).json({ error: 'Error searching packages', details: err.message });
   }
 };

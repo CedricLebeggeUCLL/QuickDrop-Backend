@@ -4,6 +4,7 @@ const packageController = require('../controllers/packageController');
 
 router.get('/', packageController.getPackages); // Alle packages ophalen
 router.get('/:id', packageController.getPackageById); // Een specifieke package ophalen
+router.get('/user/:userId', packageController.getPackagesByUserId); // Nieuwe route voor pakketten per user
 router.post('/', packageController.addPackage); // Nieuwe package aanmaken
 router.put('/:id', packageController.updatePackage); // Package bijwerken
 router.delete('/:id', packageController.deletePackage); // Package verwijderen
