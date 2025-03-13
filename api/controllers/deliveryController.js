@@ -243,3 +243,41 @@ exports.getCourierDeliveries = async (req, res) => {
     res.status(500).json({ error: 'Error fetching courier deliveries', details: err.message });
   }
 };
+
+exports.getDeliveryStats = async (req, res) => {
+  const userId = req.params.userId;
+  try {
+    const courier = await Courier.findOne({ where: { user_id: userId } });
+    if (!courier) {
+      return res.status(404).json({ error: 'Courier not found' });
+    }
+    const totalDeliveries = await Delivery.count({ where: { courier_id: courier.id } });
+    const statusCounts = await Delivery.findAll({
+      attributes: ['status', [sequelize.fn('COUNT', sequelize.col('status')), 'count']],
+      where: { courier_id: courier.id },
+      group: ['status']
+    });
+    const deliveriesPerMonth = await Delivery.findAll({
+      attributes: [
+        [sequelize.fn('YEAR', sequelize.col('pickup_time')), 'year'],
+        [sequelize.fn('MONTH', sequelize.col('pickup_time')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: { courier_id: courier.id },
+      group: ['year', 'month'],
+      order: [['year', 'ASC'], ['month', 'ASC']]
+    });
+    res.json({
+      totalDeliveries,
+      statusCounts: statusCounts.map(item => ({ status: item.status, count: item.get('count') })),
+      deliveriesPerMonth: deliveriesPerMonth.map(item => ({
+        year: item.get('year'),
+        month: item.get('month'),
+        count: item.get('count')
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching delivery stats:', err.message);
+    res.status(500).json({ error: 'Error fetching delivery stats', details: err.message });
+  }
+};

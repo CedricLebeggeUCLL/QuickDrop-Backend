@@ -9,5 +9,6 @@ router.put('/:id', deliveryController.updateDelivery); // Delivery bijwerken
 router.delete('/:id', deliveryController.cancelDelivery); // Delivery annuleren
 router.get('/history/:userId', deliveryController.getDeliveryHistory); // Leveringsgeschiedenis van een user
 router.get('/courier/:userId', deliveryController.getCourierDeliveries); // Deliveries van een specifieke courier
+router.get('/stats/:userId', deliveryController.getDeliveryStats);
 
 module.exports = router;

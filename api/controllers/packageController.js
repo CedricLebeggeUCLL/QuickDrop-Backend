@@ -521,4 +521,38 @@ exports.searchPackages = async (req, res) => {
   }
 };
 
+exports.getPackageStats = async (req, res) => {
+  const userId = req.params.userId;
+  try {
+    const totalSent = await Package.count({ where: { user_id: userId } });
+    const statusCounts = await Package.findAll({
+      attributes: ['status', [sequelize.fn('COUNT', sequelize.col('status')), 'count']],
+      where: { user_id: userId },
+      group: ['status']
+    });
+    const shipmentsPerMonth = await Package.findAll({
+      attributes: [
+        [sequelize.fn('YEAR', sequelize.col('created_at')), 'year'],
+        [sequelize.fn('MONTH', sequelize.col('created_at')), 'month'],
+        [sequelize.fn('COUNT', sequelize.col('id')), 'count']
+      ],
+      where: { user_id: userId },
+      group: ['year', 'month'],
+      order: [['year', 'ASC'], ['month', 'ASC']]
+    });
+    res.json({
+      totalSent,
+      statusCounts: statusCounts.map(item => ({ status: item.status, count: item.get('count') })),
+      shipmentsPerMonth: shipmentsPerMonth.map(item => ({
+        year: item.get('year'),
+        month: item.get('month'),
+        count: item.get('count')
+      }))
+    });
+  } catch (err) {
+    console.error('Error fetching package stats:', err.message);
+    res.status(500).json({ error: 'Error fetching package stats', details: err.message });
+  }
+};
+
 module.exports = exports;
