@@ -24,22 +24,23 @@ const Courier = sequelize.define('Courier', {
       model: Address,
       key: 'id',
     },
+    allowNull: true,
   },
   start_address_id: {
     type: DataTypes.INTEGER,
-    allowNull: false,
     references: {
       model: Address,
       key: 'id',
     },
+    allowNull: true,
   },
   destination_address_id: {
     type: DataTypes.INTEGER,
-    allowNull: false,
     references: {
       model: Address,
       key: 'id',
     },
+    allowNull: true,
   },
   pickup_radius: {
     type: DataTypes.FLOAT,
