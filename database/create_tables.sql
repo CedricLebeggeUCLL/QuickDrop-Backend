@@ -151,4 +151,4 @@ SET @bobsmith_courier_id = (SELECT id FROM couriers WHERE user_id = @bobsmith_id
 
 -- Insert sample deliveries
 INSERT INTO deliveries (package_id, courier_id, pickup_address_id, dropoff_address_id, pickup_time, status) VALUES
-(2, @bobsmith_courier_id, @dropoff_addr_id1, @pickup_addr_id1, '2023-10-01 12:00:00', 'picked_up');
+(2, @bobsmith_courier_id, @dropoff_addr_id1, @pickup_addr_id1, '2025-01-10 12:00:00', 'picked_up');
