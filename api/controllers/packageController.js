@@ -261,7 +261,7 @@ exports.updatePackage = async (req, res) => {
       description,
       ...(pickupAddressId && { pickup_address_id: pickupAddressId }),
       ...(dropoffAddressId && { dropoff_address_id: dropoffAddressId }),
-      ...(status && { status }), // Alleen updaten als status is meegegeven
+      ...(status && { status }),
     };
 
     const [updated] = await Package.update(
@@ -317,7 +317,9 @@ exports.trackPackage = async (req, res) => {
       return res.status(404).json({ error: 'Package not found' });
     }
 
+    let delivery;
     let currentLocation;
+
     if (packageItem.status === 'pending') {
       currentLocation = {
         lat: packageItem.pickupAddress.lat,
@@ -329,7 +331,7 @@ exports.trackPackage = async (req, res) => {
         lng: packageItem.dropoffAddress.lng,
       };
     } else if (packageItem.status === 'in_transit') {
-      const delivery = await Delivery.findOne({ where: { package_id: packageId } });
+      delivery = await Delivery.findOne({ where: { package_id: packageId } });
       if (!delivery) {
         return res.status(404).json({ error: 'Delivery not found for this package' });
       }
@@ -353,7 +355,7 @@ exports.trackPackage = async (req, res) => {
       currentLocation,
       pickupAddress: packageItem.pickupAddress,
       dropoffAddress: packageItem.dropoffAddress,
-      estimatedDelivery: delivery?.delivery_time || 'Niet beschikbaar',
+      estimatedDelivery: delivery ? delivery.delivery_time : 'Niet beschikbaar',
     };
 
     res.json(trackingInfo);
