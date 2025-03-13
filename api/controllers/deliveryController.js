@@ -43,7 +43,6 @@ exports.createDelivery = async (req, res) => {
 
   const transaction = await sequelize.transaction();
   try {
-    // Controleer koerier
     console.log('Finding courier with user_id:', user_id);
     const courier = await Courier.findOne({ where: { user_id }, transaction });
     if (!courier) {
@@ -53,7 +52,6 @@ exports.createDelivery = async (req, res) => {
     }
     console.log('Courier found:', courier.toJSON());
 
-    // Controleer pakket
     console.log('Finding package with package_id:', package_id);
     const package = await Package.findByPk(package_id, {
       include: [
@@ -74,7 +72,6 @@ exports.createDelivery = async (req, res) => {
       return res.status(400).json({ error: 'Package is not available for assignment' });
     }
 
-    // Maak delivery aan
     console.log('Creating delivery...');
     const delivery = await Delivery.create({
       package_id: package.id,
@@ -85,7 +82,6 @@ exports.createDelivery = async (req, res) => {
     }, { transaction });
     console.log('Delivery created:', delivery.toJSON());
 
-    // Update pakketstatus
     console.log('Updating package status to assigned...');
     await package.update({ status: 'assigned' }, { transaction });
     console.log('Package updated:', package.toJSON());
@@ -279,5 +275,59 @@ exports.getDeliveryStats = async (req, res) => {
   } catch (err) {
     console.error('Error fetching delivery stats:', err.message);
     res.status(500).json({ error: 'Error fetching delivery stats', details: err.message });
+  }
+};
+
+// Nieuw toegevoegd: trackDelivery endpoint
+exports.trackDelivery = async (req, res) => {
+  const deliveryId = req.params.id;
+
+  try {
+    const delivery = await Delivery.findByPk(deliveryId, {
+      include: [
+        { model: Package, include: [{ model: Address, as: 'pickupAddress' }, { model: Address, as: 'dropoffAddress' }] },
+        { model: Courier, include: [{ model: Address, as: 'currentAddress' }] },
+      ],
+    });
+    if (!delivery) {
+      return res.status(404).json({ error: 'Delivery not found' });
+    }
+
+    let currentLocation;
+    if (delivery.status === 'assigned') {
+      currentLocation = {
+        lat: delivery.Package.pickupAddress.lat,
+        lng: delivery.Package.pickupAddress.lng,
+      };
+    } else if (delivery.status === 'delivered') {
+      currentLocation = {
+        lat: delivery.Package.dropoffAddress.lat,
+        lng: delivery.Package.dropoffAddress.lng,
+      };
+    } else if (delivery.status === 'picked_up' || delivery.status === 'in_transit') {
+      if (!delivery.Courier || !delivery.Courier.currentAddress) {
+        return res.status(404).json({ error: 'Courier or current address not found' });
+      }
+      currentLocation = {
+        lat: delivery.Courier.currentAddress.lat,
+        lng: delivery.Courier.currentAddress.lng,
+      };
+    } else {
+      return res.status(400).json({ error: 'Invalid delivery status for tracking' });
+    }
+
+    const trackingInfo = {
+      deliveryId: delivery.id,
+      status: delivery.status,
+      currentLocation,
+      pickupAddress: delivery.Package.pickupAddress,
+      dropoffAddress: delivery.Package.dropoffAddress,
+      estimatedDelivery: delivery.delivery_time || 'Niet beschikbaar',
+    };
+
+    res.json(trackingInfo);
+  } catch (err) {
+    console.error('Error tracking delivery:', err.message);
+    res.status(500).json({ error: 'Error tracking delivery', details: err.message });
   }
 };

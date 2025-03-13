@@ -6,6 +6,7 @@ const Courier = require('../models/courier');
 const Address = require('../models/address');
 const PostalCode = require('../models/postalcode');
 const User = require('../models/user');
+const Delivery = require('../models/delivery');
 
 exports.getPackages = async (req, res) => {
   try {
@@ -316,33 +317,43 @@ exports.trackPackage = async (req, res) => {
       return res.status(404).json({ error: 'Package not found' });
     }
 
-    if (packageItem.status !== 'in_transit') {
-      return res.status(400).json({ error: 'Package is not in transit' });
+    let currentLocation;
+    if (packageItem.status === 'pending') {
+      currentLocation = {
+        lat: packageItem.pickupAddress.lat,
+        lng: packageItem.pickupAddress.lng,
+      };
+    } else if (packageItem.status === 'delivered') {
+      currentLocation = {
+        lat: packageItem.dropoffAddress.lat,
+        lng: packageItem.dropoffAddress.lng,
+      };
+    } else if (packageItem.status === 'in_transit') {
+      const delivery = await Delivery.findOne({ where: { package_id: packageId } });
+      if (!delivery) {
+        return res.status(404).json({ error: 'Delivery not found for this package' });
+      }
+      const courier = await Courier.findByPk(delivery.courier_id, {
+        include: [{ model: Address, as: 'currentAddress' }],
+      });
+      if (!courier || !courier.currentAddress) {
+        return res.status(404).json({ error: 'Courier or current address not found' });
+      }
+      currentLocation = {
+        lat: courier.currentAddress.lat,
+        lng: courier.currentAddress.lng,
+      };
+    } else {
+      return res.status(400).json({ error: 'Invalid package status for tracking' });
     }
-
-    const delivery = await Delivery.findOne({ where: { package_id: packageId } });
-    if (!delivery) {
-      return res.status(404).json({ error: 'Delivery not found for this package' });
-    }
-
-    const courier = await Courier.findByPk(delivery.courier_id, {
-      include: [{ model: Address, as: 'currentAddress' }],
-    });
-    if (!courier) {
-      return res.status(404).json({ error: 'Courier not found' });
-    }
-
-    const currentCoords = courier.currentAddress
-      ? await geocodeAddress(courier.currentAddress)
-      : { lat: null, lng: null };
 
     const trackingInfo = {
       packageId: packageItem.id,
       status: packageItem.status,
+      currentLocation,
       pickupAddress: packageItem.pickupAddress,
       dropoffAddress: packageItem.dropoffAddress,
-      currentLocation: currentCoords,
-      estimatedDelivery: delivery.delivery_time || 'Niet beschikbaar',
+      estimatedDelivery: delivery?.delivery_time || 'Niet beschikbaar',
     };
 
     res.json(trackingInfo);
