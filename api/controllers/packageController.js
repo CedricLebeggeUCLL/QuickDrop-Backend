@@ -317,35 +317,22 @@ exports.trackPackage = async (req, res) => {
       return res.status(404).json({ error: 'Package not found' });
     }
 
-    let delivery;
     let currentLocation;
 
-    if (packageItem.status === 'pending') {
+    if (packageItem.status === 'assigned') {
+      // Toon de startbestemming (pickupAddress) voor 'assigned'
       currentLocation = {
         lat: packageItem.pickupAddress.lat,
         lng: packageItem.pickupAddress.lng,
       };
     } else if (packageItem.status === 'delivered') {
+      // Toon de bestemmingslocatie (dropoffAddress) voor 'delivered'
       currentLocation = {
         lat: packageItem.dropoffAddress.lat,
         lng: packageItem.dropoffAddress.lng,
       };
-    } else if (packageItem.status === 'in_transit') {
-      delivery = await Delivery.findOne({ where: { package_id: packageId } });
-      if (!delivery) {
-        return res.status(404).json({ error: 'Delivery not found for this package' });
-      }
-      const courier = await Courier.findByPk(delivery.courier_id, {
-        include: [{ model: Address, as: 'currentAddress' }],
-      });
-      if (!courier || !courier.currentAddress) {
-        return res.status(404).json({ error: 'Courier or current address not found' });
-      }
-      currentLocation = {
-        lat: courier.currentAddress.lat,
-        lng: courier.currentAddress.lng,
-      };
     } else {
+      // Voor 'pending', 'in_transit' en andere statussen geen tracking
       return res.status(400).json({ error: 'Invalid package status for tracking' });
     }
 
@@ -355,7 +342,7 @@ exports.trackPackage = async (req, res) => {
       currentLocation,
       pickupAddress: packageItem.pickupAddress,
       dropoffAddress: packageItem.dropoffAddress,
-      estimatedDelivery: delivery ? delivery.delivery_time : 'Niet beschikbaar',
+      estimatedDelivery: 'Niet beschikbaar', // Voor nu standaard, later aanpasbaar
     };
 
     res.json(trackingInfo);
