@@ -4,9 +4,7 @@ const Address = require('../models/address');
 
 exports.getUsers = async (req, res) => {
   try {
-    const users = await User.findAll({
-      include: [{ model: Address, as: 'currentAddress' }], // Optioneel, afhankelijk van relaties
-    });
+    const users = await User.findAll(); // include verwijderd
     res.json(users);
   } catch (err) {
     res.status(500).json({ error: 'Fout bij ophalen van gebruikers', details: err.message });
@@ -15,9 +13,7 @@ exports.getUsers = async (req, res) => {
 
 exports.getUserById = async (req, res) => {
   try {
-    const user = await User.findByPk(req.params.id, {
-      include: [{ model: Address, as: 'currentAddress' }],
-    });
+    const user = await User.findByPk(req.params.id); // include al verwijderd
     if (!user) return res.status(404).json({ error: 'Gebruiker niet gevonden' });
     res.json(user);
   } catch (err) {
@@ -39,9 +35,7 @@ exports.updateUser = async (req, res) => {
   try {
     const [updated] = await User.update(req.body, { where: { id: req.params.id } });
     if (updated === 0) return res.status(404).json({ error: 'Gebruiker niet gevonden' });
-    const updatedUser = await User.findByPk(req.params.id, {
-      include: [{ model: Address, as: 'currentAddress' }],
-    });
+    const updatedUser = await User.findByPk(req.params.id); // include verwijderd
     res.json(updatedUser);
   } catch (err) {
     res.status(500).json({ error: 'Fout bij updaten van gebruiker', details: err.message });
@@ -71,7 +65,7 @@ exports.registerUser = async (req, res) => {
 exports.loginUser = async (req, res) => {
   const { email, password } = req.body;
   try {
-    const user = await User.findOne({ where: { email } }); // Verwijder include: Address
+    const user = await User.findOne({ where: { email } }); // include al verwijderd
     if (!user) return res.status(404).json({ error: 'Gebruiker niet gevonden' });
     if (user.password !== password) return res.status(401).json({ error: 'Ongeldig wachtwoord' });
     res.status(200).json({ userId: user.id, token: 'dummy-token' }); // Retourneer userId en token
