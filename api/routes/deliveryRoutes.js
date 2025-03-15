@@ -3,7 +3,6 @@ const router = express.Router();
 const deliveryController = require('../controllers/deliveryController');
 
 router.get('/', deliveryController.getDeliveries); // Alle deliveries ophalen
-router.get('/user/:userId', deliveryController.getDeliveriesByUserId); // Leveringen van een specifieke gebruiker
 router.get('/:id', deliveryController.getDeliveryById); // Een specifieke delivery ophalen
 router.post('/', deliveryController.createDelivery); // Nieuwe delivery aanmaken
 router.put('/:id', deliveryController.updateDelivery); // Delivery bijwerken
