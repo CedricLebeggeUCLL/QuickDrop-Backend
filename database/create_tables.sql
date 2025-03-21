@@ -57,7 +57,7 @@ CREATE TABLE packages (
   FOREIGN KEY (dropoff_address_id) REFERENCES addresses(id) ON DELETE RESTRICT
 );
 
--- Couriers table
+-- Couriers table with current_lat and current_lng for live tracking
 CREATE TABLE couriers (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL UNIQUE,
@@ -69,6 +69,8 @@ CREATE TABLE couriers (
   availability BOOLEAN DEFAULT TRUE,
   itsme_code VARCHAR(50),
   license_number VARCHAR(50),
+  current_lat DECIMAL(10, 7),
+  current_lng DECIMAL(10, 7),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (current_address_id) REFERENCES addresses(id) ON DELETE SET NULL,
   FOREIGN KEY (start_address_id) REFERENCES addresses(id) ON DELETE RESTRICT,
@@ -101,7 +103,7 @@ INSERT INTO postal_codes (code, city, country) VALUES
 -- Insert sample addresses with coordinates
 INSERT INTO addresses (street_name, house_number, extra_info, postal_code, lat, lng) VALUES
 ('Rue de la Loi', '100', NULL, '1000', 50.8442333, 4.375933), -- Brussels
-('Meir', '50', NULL, '2000', 51.2182, 4.4051), -- Antwerp (vervanging voor Antwerpseweg)
+('Meir', '50', NULL, '2000', 51.2182, 4.4051), -- Antwerp
 ('Boulevard Anspach', '20', 'Apt 5', '1000', 50.847647, 4.350648), -- Brussels
 ('Beemdstraat', '8', NULL, '1910', 50.9546577, 4.5623148), -- Kampenhout
 ('Sliksteenvest', '5', NULL, '3300', 50.8111583, 4.944302), -- Tienen
@@ -119,7 +121,7 @@ INSERT INTO users (username, email, password, role) VALUES
 
 -- Insert sample packages
 SET @pickup_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Rue de la Loi' AND house_number = '100');
-SET @dropoff_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Meir' AND house_number = '50'); -- Gewijzigd naar Meir
+SET @dropoff_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Meir' AND house_number = '50');
 SET @pickup_addr_id2 = (SELECT id FROM addresses WHERE street_name = 'Beemdstraat' AND house_number = '8');
 SET @dropoff_addr_id2 = (SELECT id FROM addresses WHERE street_name = 'Sliksteenvest' AND house_number = '5');
 SET @pickup_addr_id3 = (SELECT id FROM addresses WHERE street_name = 'Sliksteenvest' AND house_number = '5');
@@ -139,12 +141,12 @@ SET @adminuser_id = (SELECT id FROM users WHERE username = 'adminuser');
 -- Get address IDs for couriers
 SET @current_addr_id = (SELECT id FROM addresses WHERE street_name = 'Boulevard Anspach' AND house_number = '20');
 SET @start_addr_id = (SELECT id FROM addresses WHERE street_name = 'Rue de la Loi' AND house_number = '100');
-SET @dest_addr_id = (SELECT id FROM addresses WHERE street_name = 'Meir' AND house_number = '50'); -- Gewijzigd naar Meir
+SET @dest_addr_id = (SELECT id FROM addresses WHERE street_name = 'Meir' AND house_number = '50');
 
 -- Insert sample couriers
-INSERT INTO couriers (user_id, current_address_id, start_address_id, destination_address_id, pickup_radius, dropoff_radius, availability, itsme_code, license_number) VALUES
-(@bobsmith_id, @current_addr_id, @start_addr_id, @dest_addr_id, 10.0, 15.0, TRUE, 'ITSME123', 'ABC123456'),
-(@adminuser_id, @dest_addr_id, @dest_addr_id, @start_addr_id, 5.0, 5.0, TRUE, 'ITSME456', NULL);
+INSERT INTO couriers (user_id, current_address_id, start_address_id, destination_address_id, pickup_radius, dropoff_radius, availability, itsme_code, license_number, current_lat, current_lng) VALUES
+(@bobsmith_id, @current_addr_id, @start_addr_id, @dest_addr_id, 10.0, 15.0, TRUE, 'ITSME123', 'ABC123456', NULL, NULL),
+(@adminuser_id, @dest_addr_id, @dest_addr_id, @start_addr_id, 5.0, 5.0, TRUE, 'ITSME456', NULL, NULL, NULL);
 
 -- Get courier IDs for deliveries
 SET @bobsmith_courier_id = (SELECT id FROM couriers WHERE user_id = @bobsmith_id);

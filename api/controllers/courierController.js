@@ -62,9 +62,8 @@ exports.becomeCourier = async (req, res) => {
     return res.status(400).json({ error: 'Itsme verification code is required' });
   }
 
-  const transaction = await sequelize.transaction(); // Start een transactie
+  const transaction = await sequelize.transaction();
   try {
-    // Controleer of de user bestaat
     const user = await User.findByPk(user_id, { transaction });
     if (!user) {
       console.log(`User met ID ${user_id} niet gevonden`);
@@ -72,31 +71,30 @@ exports.becomeCourier = async (req, res) => {
       return res.status(404).json({ error: 'User does not exist' });
     }
 
-    // Controleer of de user al een courier is
     const existingCourier = await Courier.findOne({ where: { user_id }, transaction });
     if (existingCourier) {
       await transaction.rollback();
       return res.status(400).json({ error: 'User is already a courier' });
     }
 
-    // Maak de nieuwe courier zonder coördinaten, maar met optionele adressen
     const courierData = {
       user_id,
-      current_address_id: null, // Optioneel, kan later worden ingesteld
-      start_address_id: null,  // Wordt later ingesteld via update
-      destination_address_id: null, // Wordt later ingesteld via update
+      current_address_id: null,
+      start_address_id: null,
+      destination_address_id: null,
       pickup_radius: 5.0,
       dropoff_radius: 5.0,
       availability: true,
       itsme_code,
       license_number: license_number || null,
+      current_lat: null,
+      current_lng: null,
     };
 
     console.log('Data to create:', courierData);
     const courier = await Courier.create(courierData, { transaction });
     console.log('Created courier:', courier.toJSON());
 
-    // Update de rol van de gebruiker naar 'courier'
     const [updated] = await User.update(
       { role: 'courier' },
       { where: { id: user_id }, transaction }
@@ -123,14 +121,12 @@ exports.updateCourier = async (req, res) => {
   const transaction = await sequelize.transaction();
 
   try {
-    // Haal de bestaande courier op
     const courier = await Courier.findByPk(req.params.id, { transaction });
     if (!courier) {
       await transaction.rollback();
       return res.status(404).json({ error: 'Courier not found' });
     }
 
-    // Maak of gebruik bestaande adressen
     let startAddressId, destAddressId;
     if (start_address) {
       const [startAddress, created] = await Address.findOrCreate({
@@ -198,5 +194,18 @@ exports.deleteCourier = async (req, res) => {
     res.status(204).send();
   } catch (err) {
     res.status(500).json({ error: 'Error deleting courier', details: err.message });
+  }
+};
+
+exports.updateCourierLocation = async (req, res) => {
+  const id = req.params.id; // Get the ID from the URL
+  const { lat, lng } = req.body; // Get lat and lng from the body
+  try {
+    const courier = await Courier.findByPk(id);
+    if (!courier) return res.status(404).json({ error: 'Courier not found' });
+    await courier.update({ current_lat: lat, current_lng: lng });
+    res.json({ message: 'Location updated' });
+  } catch (err) {
+    res.status(500).json({ error: 'Error updating location', details: err.message });
   }
 };

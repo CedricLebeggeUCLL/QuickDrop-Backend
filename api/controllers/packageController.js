@@ -305,7 +305,6 @@ exports.deletePackage = async (req, res) => {
 
 exports.trackPackage = async (req, res) => {
   const packageId = req.params.id;
-
   try {
     const packageItem = await Package.findByPk(packageId, {
       include: [
@@ -318,21 +317,40 @@ exports.trackPackage = async (req, res) => {
     }
 
     let currentLocation;
-
     if (packageItem.status === 'assigned') {
-      // Toon de startbestemming (pickupAddress) voor 'assigned'
       currentLocation = {
         lat: packageItem.pickupAddress.lat,
         lng: packageItem.pickupAddress.lng,
       };
     } else if (packageItem.status === 'delivered') {
-      // Toon de bestemmingslocatie (dropoffAddress) voor 'delivered'
       currentLocation = {
         lat: packageItem.dropoffAddress.lat,
         lng: packageItem.dropoffAddress.lng,
       };
+    } else if (packageItem.status === 'in_transit') {
+      const delivery = await Delivery.findOne({
+        where: { package_id: packageId, status: 'in_transit' },
+      });
+      if (delivery) {
+        const courier = await Courier.findByPk(delivery.courier_id);
+        if (courier && courier.current_lat && courier.current_lng) {
+          currentLocation = {
+            lat: courier.current_lat,
+            lng: courier.current_lng,
+          };
+        } else {
+          currentLocation = {
+            lat: packageItem.pickupAddress.lat,
+            lng: packageItem.pickupAddress.lng,
+          };
+        }
+      } else {
+        currentLocation = {
+          lat: packageItem.pickupAddress.lat,
+          lng: packageItem.pickupAddress.lng,
+        };
+      }
     } else {
-      // Voor 'pending', 'in_transit' en andere statussen geen tracking
       return res.status(400).json({ error: 'Invalid package status for tracking' });
     }
 
@@ -342,7 +360,7 @@ exports.trackPackage = async (req, res) => {
       currentLocation,
       pickupAddress: packageItem.pickupAddress,
       dropoffAddress: packageItem.dropoffAddress,
-      estimatedDelivery: 'Niet beschikbaar', // Voor nu standaard, later aanpasbaar
+      estimatedDelivery: 'Niet beschikbaar',
     };
 
     res.json(trackingInfo);

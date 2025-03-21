@@ -60,6 +60,14 @@ const Courier = sequelize.define('Courier', {
   license_number: {
     type: DataTypes.STRING(50),
   },
+  current_lat: {
+    type: DataTypes.DECIMAL(10, 7),
+    allowNull: true,
+  },
+  current_lng: {
+    type: DataTypes.DECIMAL(10, 7),
+    allowNull: true,
+  },
 }, {
   tableName: 'couriers',
   timestamps: false,

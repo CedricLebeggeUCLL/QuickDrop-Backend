@@ -9,4 +9,7 @@ router.post('/become', courierController.becomeCourier); // Nieuwe courier aanma
 router.put('/:id', courierController.updateCourier); // Courier bijwerken
 router.delete('/:id', courierController.deleteCourier); // Courier verwijderen
 
+// Nieuwe route voor het updaten van de locatie van de courier
+router.post('/:id/location', courierController.updateCourierLocation);
+
 module.exports = router;
