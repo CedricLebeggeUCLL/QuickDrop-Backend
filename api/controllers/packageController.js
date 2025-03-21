@@ -329,22 +329,33 @@ exports.trackPackage = async (req, res) => {
       };
     } else if (packageItem.status === 'in_transit') {
       const delivery = await Delivery.findOne({
-        where: { package_id: packageId, status: 'in_transit' },
+        where: { package_id: packageId, status: 'picked_up' },
       });
       if (delivery) {
         const courier = await Courier.findByPk(delivery.courier_id);
-        if (courier && courier.current_lat && courier.current_lng) {
-          currentLocation = {
-            lat: courier.current_lat,
-            lng: courier.current_lng,
-          };
+        if (courier) {
+          if (courier.current_lat && courier.current_lng) {
+            currentLocation = {
+              lat: courier.current_lat,
+              lng: courier.current_lng,
+            };
+            console.log(`Courier location retrieved for package ${packageId}:`, currentLocation);
+          } else {
+            console.error(`Courier ${courier.id} has no current location set.`);
+            currentLocation = {
+              lat: packageItem.pickupAddress.lat,
+              lng: packageItem.pickupAddress.lng,
+            };
+          }
         } else {
+          console.error(`No courier found for delivery ${delivery.id}.`);
           currentLocation = {
             lat: packageItem.pickupAddress.lat,
             lng: packageItem.pickupAddress.lng,
           };
         }
       } else {
+        console.error(`No active delivery found for package ${packageId}.`);
         currentLocation = {
           lat: packageItem.pickupAddress.lat,
           lng: packageItem.pickupAddress.lng,
