@@ -49,7 +49,7 @@ const Delivery = sequelize.define('Delivery', {
     type: DataTypes.DATE,
   },
   status: {
-    type: DataTypes.ENUM('assigned', 'picked_up', 'in_transit', 'delivered'),
+    type: DataTypes.ENUM('assigned', 'picked_up', 'delivered'),
     defaultValue: 'assigned',
   },
 }, {
