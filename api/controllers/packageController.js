@@ -12,11 +12,56 @@ exports.getPackages = async (req, res) => {
   try {
     const packages = await Package.findAll({
       include: [
-        { model: Address, as: 'pickupAddress' },
-        { model: Address, as: 'dropoffAddress' },
+        {
+          model: Address,
+          as: 'pickupAddress',
+          include: [
+            {
+              model: PostalCode,
+              as: 'postalCodeDetails',
+              attributes: ['city', 'country'],
+            },
+          ],
+        },
+        {
+          model: Address,
+          as: 'dropoffAddress',
+          include: [
+            {
+              model: PostalCode,
+              as: 'postalCodeDetails',
+              attributes: ['city', 'country'],
+            },
+          ],
+        },
       ],
     });
-    res.json(packages);
+
+    // Transformeer de data om city en country toe te voegen
+    const transformedPackages = packages.map(pkg => {
+      const pkgJson = pkg.toJSON();
+      return {
+        ...pkgJson,
+        pickupAddress: {
+          ...pkgJson.pickupAddress,
+          city: pkgJson.pickupAddress.postalCodeDetails?.city || null,
+          country: pkgJson.pickupAddress.postalCodeDetails?.country || null,
+        },
+        dropoffAddress: {
+          ...pkgJson.dropoffAddress,
+          city: pkgJson.dropoffAddress.postalCodeDetails?.city || null,
+          country: pkgJson.dropoffAddress.postalCodeDetails?.country || null,
+        },
+      };
+    });
+
+    // Verwijder postalCodeDetails uit de response
+    transformedPackages.forEach(pkg => {
+      delete pkg.pickupAddress.postalCodeDetails;
+      delete pkg.dropoffAddress.postalCodeDetails;
+    });
+
+    res.json(transformedPackages);
   } catch (err) {
     console.error('Error fetching packages:', err.message);
     res.status(500).json({ error: 'Error fetching packages', details: err.message });
@@ -86,17 +131,63 @@ exports.getPackagesByUserId = async (req, res) => {
     const packages = await Package.findAll({
       where: { user_id: userId },
       include: [
-        { model: Address, as: 'pickupAddress' },
-        { model: Address, as: 'dropoffAddress' },
+        {
+          model: Address,
+          as: 'pickupAddress',
+          include: [
+            {
+              model: PostalCode,
+              as: 'postalCodeDetails',
+              attributes: ['city', 'country'],
+            },
+          ],
+        },
+        {
+          model: Address,
+          as: 'dropoffAddress',
+          include: [
+            {
+              model: PostalCode,
+              as: 'postalCodeDetails',
+              attributes: ['city', 'country'],
+            },
+          ],
+        },
       ],
     });
-    res.json(packages);
+
+    // Transformeer de data om city en country toe te voegen
+    const transformedPackages = packages.map(pkg => {
+      const pkgJson = pkg.toJSON();
+      return {
+        ...pkgJson,
+        pickupAddress: {
+          ...pkgJson.pickupAddress,
+          city: pkgJson.pickupAddress.postalCodeDetails?.city || null,
+          country: pkgJson.pickupAddress.postalCodeDetails?.country || null,
+        },
+        dropoffAddress: {
+          ...pkgJson.dropoffAddress,
+          city: pkgJson.dropoffAddress.postalCodeDetails?.city || null,
+          country: pkgJson.dropoffAddress.postalCodeDetails?.country || null,
+        },
+      };
+    });
+
+    // Verwijder postalCodeDetails uit de response
+    transformedPackages.forEach(pkg => {
+      delete pkg.pickupAddress.postalCodeDetails;
+      delete pkg.dropoffAddress.postalCodeDetails;
+    });
+
+    res.json(transformedPackages);
   } catch (err) {
     console.error('Error fetching packages by user ID:', err.message);
     res.status(500).json({ error: 'Error fetching packages by user ID', details: err.message });
   }
 };
 
+// De rest van de controller (zoals addPackage, updatePackage, etc.) blijft ongewijzigd in deze context
 exports.addPackage = async (req, res) => {
   console.log('Entering addPackage endpoint');
   const userId = req.body.user_id;
