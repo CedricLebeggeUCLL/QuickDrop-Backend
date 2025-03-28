@@ -33,8 +33,8 @@ exports.getPackageById = async (req, res) => {
           include: [
             {
               model: PostalCode,
-              as: 'postalCodeDetails', // Alias voor de relatie
-              attributes: ['city', 'country'], // Alleen deze velden ophalen
+              as: 'postalCodeDetails',
+              attributes: ['city', 'country'],
             },
           ],
         },
@@ -44,8 +44,8 @@ exports.getPackageById = async (req, res) => {
           include: [
             {
               model: PostalCode,
-              as: 'postalCodeDetails', // Alias voor de relatie
-              attributes: ['city', 'country'], // Alleen deze velden ophalen
+              as: 'postalCodeDetails',
+              attributes: ['city', 'country'],
             },
           ],
         },
@@ -53,7 +53,6 @@ exports.getPackageById = async (req, res) => {
     });
     if (!packageItem) return res.status(404).json({ error: 'Package not found' });
 
-    // Transformeer de response om city en country direct in pickupAddress en dropoffAddress te zetten
     const transformedPackage = {
       ...packageItem.toJSON(),
       pickupAddress: {
@@ -68,7 +67,6 @@ exports.getPackageById = async (req, res) => {
       },
     };
 
-    // Verwijder de postalCodeDetails objecten uit de response
     delete transformedPackage.pickupAddress.postalCodeDetails;
     delete transformedPackage.dropoffAddress.postalCodeDetails;
 
@@ -159,7 +157,14 @@ exports.addPackage = async (req, res) => {
         extra_info: pickup_address.extra_info || null,
         postal_code: pickup_address.postal_code,
       },
-      defaults: { ...pickup_address, lat: pickupCoords.lat, lng: pickupCoords.lng },
+      defaults: {
+        street_name: pickup_address.street_name,
+        house_number: pickup_address.house_number,
+        extra_info: pickup_address.extra_info || null,
+        postal_code: pickup_address.postal_code,
+        lat: pickupCoords.lat,
+        lng: pickupCoords.lng,
+      },
       transaction,
     });
     console.log('Pickup address created/updated:', pickupAddress.toJSON());
@@ -177,7 +182,14 @@ exports.addPackage = async (req, res) => {
         extra_info: dropoff_address.extra_info || null,
         postal_code: dropoff_address.postal_code,
       },
-      defaults: { ...dropoff_address, lat: dropoffCoords.lat, lng: dropoffCoords.lng },
+      defaults: {
+        street_name: dropoff_address.street_name,
+        house_number: dropoff_address.house_number,
+        extra_info: dropoff_address.extra_info || null,
+        postal_code: dropoff_address.postal_code,
+        lat: dropoffCoords.lat,
+        lng: dropoffCoords.lng,
+      },
       transaction,
     });
     console.log('Dropoff address created/updated:', dropoffAddress.toJSON());
@@ -224,7 +236,7 @@ exports.updatePackage = async (req, res) => {
           console.log(`Adding new postal code: ${address.postal_code}, ${address.city || 'Unknown'}, ${address.country || 'Belgium'}`);
           await PostalCode.create({
             code: address.postal_code,
-            city: address.city || 'Unknown', // Fallback als city ontbreekt
+            city: address.city || 'Unknown',
             country: address.country || 'Belgium',
           }, { transaction });
           console.log(`Postal code ${address.postal_code} added`);
@@ -241,7 +253,6 @@ exports.updatePackage = async (req, res) => {
         return res.status(500).json({ error: 'Geocoding failed for pickup address', details: pickupCoords });
       }
 
-      // Alleen velden die in de Address tabel bestaan
       const [pickupAddress] = await Address.findOrCreate({
         where: {
           street_name: pickup_address.street_name || 'Unknown',
@@ -276,7 +287,7 @@ exports.updatePackage = async (req, res) => {
           console.log(`Adding new postal code: ${address.postal_code}, ${address.city || 'Unknown'}, ${address.country || 'Belgium'}`);
           await PostalCode.create({
             code: address.postal_code,
-            city: address.city || 'Unknown', // Fallback als city ontbreekt
+            city: address.city || 'Unknown',
             country: address.country || 'Belgium',
           }, { transaction });
           console.log(`Postal code ${address.postal_code} added`);
@@ -293,7 +304,6 @@ exports.updatePackage = async (req, res) => {
         return res.status(500).json({ error: 'Geocoding failed for dropoff address', details: dropoffCoords });
       }
 
-      // Alleen velden die in de Address tabel bestaan
       const [dropoffAddress] = await Address.findOrCreate({
         where: {
           street_name: dropoff_address.street_name || 'Unknown',
@@ -355,7 +365,6 @@ exports.updatePackage = async (req, res) => {
     await transaction.commit();
     console.log('Package updated:', updatedPackage.toJSON());
 
-    // Transformeer de response zoals in getPackageById
     const transformedPackage = {
       ...updatedPackage.toJSON(),
       pickupAddress: updatedPackage.pickupAddress ? {

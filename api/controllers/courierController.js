@@ -1,4 +1,5 @@
 const { sequelize } = require('../db');
+const { geocodeAddress } = require('../../utils/geocode');
 const Courier = require('../models/courier');
 const User = require('../models/user');
 const Address = require('../models/address');
@@ -128,6 +129,7 @@ exports.updateCourier = async (req, res) => {
     }
 
     let startAddressId, destAddressId;
+
     if (start_address) {
       const [startAddress, created] = await Address.findOrCreate({
         where: {
@@ -136,9 +138,23 @@ exports.updateCourier = async (req, res) => {
           extra_info: start_address.extra_info || null,
           postal_code: start_address.postal_code,
         },
-        defaults: start_address,
+        defaults: {
+          street_name: start_address.street_name,
+          house_number: start_address.house_number,
+          extra_info: start_address.extra_info || null,
+          postal_code: start_address.postal_code,
+        },
         transaction,
       });
+
+      if (!startAddress.lat || !startAddress.lng) {
+        const coords = await geocodeAddress(start_address);
+        if (!coords || !coords.lat || !coords.lng) {
+          throw new Error('Failed to geocode start address');
+        }
+        await startAddress.update({ lat: coords.lat, lng: coords.lng }, { transaction });
+      }
+
       startAddressId = startAddress.id;
     }
 
@@ -150,9 +166,23 @@ exports.updateCourier = async (req, res) => {
           extra_info: destination_address.extra_info || null,
           postal_code: destination_address.postal_code,
         },
-        defaults: destination_address,
+        defaults: {
+          street_name: destination_address.street_name,
+          house_number: destination_address.house_number,
+          extra_info: destination_address.extra_info || null,
+          postal_code: destination_address.postal_code,
+        },
         transaction,
       });
+
+      if (!destAddress.lat || !destAddress.lng) {
+        const coords = await geocodeAddress(destination_address);
+        if (!coords || !coords.lat || !coords.lng) {
+          throw new Error('Failed to geocode destination address');
+        }
+        await destAddress.update({ lat: coords.lat, lng: coords.lng }, { transaction });
+      }
+
       destAddressId = destAddress.id;
     }
 
@@ -164,11 +194,7 @@ exports.updateCourier = async (req, res) => {
       availability: availability !== undefined ? availability : courier.availability,
     };
 
-    const [updated] = await Courier.update(updateData, { where: { id: req.params.id }, transaction });
-    if (updated === 0) {
-      await transaction.rollback();
-      return res.status(404).json({ error: 'Courier not found' });
-    }
+    await courier.update(updateData, { transaction });
 
     const updatedCourier = await Courier.findByPk(req.params.id, {
       include: [
@@ -183,6 +209,7 @@ exports.updateCourier = async (req, res) => {
     res.json(updatedCourier);
   } catch (err) {
     await transaction.rollback();
+    console.error('Error updating courier:', err);
     res.status(500).json({ error: 'Error updating courier', details: err.message });
   }
 };
@@ -198,8 +225,8 @@ exports.deleteCourier = async (req, res) => {
 };
 
 exports.updateCourierLocation = async (req, res) => {
-  const id = req.params.id; // Get the ID from the URL
-  const { lat, lng } = req.body; // Get lat and lng from the body
+  const id = req.params.id;
+  const { lat, lng } = req.body;
   try {
     const courier = await Courier.findByPk(id);
     if (!courier) return res.status(404).json({ error: 'Courier not found' });
