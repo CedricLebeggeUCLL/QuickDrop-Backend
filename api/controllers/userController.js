@@ -63,9 +63,16 @@ exports.registerUser = async (req, res) => {
 };
 
 exports.loginUser = async (req, res) => {
-  const { email, password } = req.body;
+  const { identifier, password } = req.body; // identifier kan gebruikersnaam of e-mail zijn
   try {
-    const user = await User.findOne({ where: { email } }); // include al verwijderd
+    let user;
+    if (identifier.includes('@')) {
+      // Zoek op e-mail
+      user = await User.findOne({ where: { email: identifier } });
+    } else {
+      // Zoek op gebruikersnaam
+      user = await User.findOne({ where: { username: identifier } });
+    }
     if (!user) return res.status(404).json({ error: 'Gebruiker niet gevonden' });
     if (user.password !== password) return res.status(401).json({ error: 'Ongeldig wachtwoord' });
     res.status(200).json({ userId: user.id, token: 'dummy-token' }); // Retourneer userId en token
