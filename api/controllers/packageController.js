@@ -213,41 +213,50 @@ exports.updatePackage = async (req, res) => {
 
     if (pickup_address) {
       const processPostalCode = async (address) => {
-        if (address.postal_code) {
-          const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code } });
-          if (!postalCodeExists) {
-            console.log(`Adding new postal code: ${address.postal_code}, ${address.city}, ${address.country || 'Belgium'}`);
-            await PostalCode.create({
-              code: address.postal_code,
-              city: address.city,
-              country: address.country || 'Belgium',
-            }, { transaction });
-            console.log(`Postal code ${address.postal_code} added`);
-          } else {
-            console.log(`Postal code ${address.postal_code} already exists`);
-          }
-        } else {
-          console.log('No postal_code provided for address');
+        if (!address.postal_code) {
+          console.error('No postal_code provided for pickup_address');
           await transaction.rollback();
-          return res.status(400).json({ error: 'Postal code is required for address' });
+          return res.status(400).json({ error: 'Postal code is required for pickup address' });
+        }
+
+        const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code } });
+        if (!postalCodeExists) {
+          console.log(`Adding new postal code: ${address.postal_code}, ${address.city || 'Unknown'}, ${address.country || 'Belgium'}`);
+          await PostalCode.create({
+            code: address.postal_code,
+            city: address.city || 'Unknown', // Fallback als city ontbreekt
+            country: address.country || 'Belgium',
+          }, { transaction });
+          console.log(`Postal code ${address.postal_code} added`);
+        } else {
+          console.log(`Postal code ${address.postal_code} already exists`);
         }
       };
       await processPostalCode(pickup_address);
 
       const pickupCoords = await geocodeAddress(pickup_address);
-      if (!pickupCoords.lat || !pickupCoords.lng) {
-        console.log('Geocoding failed for pickup address:', pickupCoords);
+      if (!pickupCoords || !pickupCoords.lat || !pickupCoords.lng) {
+        console.error('Geocoding failed for pickup address:', pickupCoords);
         await transaction.rollback();
-        return res.status(500).json({ error: 'Geocoding failed for pickup address' });
+        return res.status(500).json({ error: 'Geocoding failed for pickup address', details: pickupCoords });
       }
+
+      // Alleen velden die in de Address tabel bestaan
       const [pickupAddress] = await Address.findOrCreate({
         where: {
-          street_name: pickup_address.street_name,
-          house_number: pickup_address.house_number,
+          street_name: pickup_address.street_name || 'Unknown',
+          house_number: pickup_address.house_number || 'Unknown',
           extra_info: pickup_address.extra_info || null,
           postal_code: pickup_address.postal_code,
         },
-        defaults: { ...pickup_address, lat: pickupCoords.lat, lng: pickupCoords.lng },
+        defaults: {
+          street_name: pickup_address.street_name || 'Unknown',
+          house_number: pickup_address.house_number || 'Unknown',
+          extra_info: pickup_address.extra_info || null,
+          postal_code: pickup_address.postal_code,
+          lat: pickupCoords.lat,
+          lng: pickupCoords.lng,
+        },
         transaction,
       });
       pickupAddressId = pickupAddress.id;
@@ -256,41 +265,50 @@ exports.updatePackage = async (req, res) => {
 
     if (dropoff_address) {
       const processPostalCode = async (address) => {
-        if (address.postal_code) {
-          const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code } });
-          if (!postalCodeExists) {
-            console.log(`Adding new postal code: ${address.postal_code}, ${address.city}, ${address.country || 'Belgium'}`);
-            await PostalCode.create({
-              code: address.postal_code,
-              city: address.city,
-              country: address.country || 'Belgium',
-            }, { transaction });
-            console.log(`Postal code ${address.postal_code} added`);
-          } else {
-            console.log(`Postal code ${address.postal_code} already exists`);
-          }
-        } else {
-          console.log('No postal_code provided for address');
+        if (!address.postal_code) {
+          console.error('No postal_code provided for dropoff_address');
           await transaction.rollback();
-          return res.status(400).json({ error: 'Postal code is required for address' });
+          return res.status(400).json({ error: 'Postal code is required for dropoff address' });
+        }
+
+        const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code } });
+        if (!postalCodeExists) {
+          console.log(`Adding new postal code: ${address.postal_code}, ${address.city || 'Unknown'}, ${address.country || 'Belgium'}`);
+          await PostalCode.create({
+            code: address.postal_code,
+            city: address.city || 'Unknown', // Fallback als city ontbreekt
+            country: address.country || 'Belgium',
+          }, { transaction });
+          console.log(`Postal code ${address.postal_code} added`);
+        } else {
+          console.log(`Postal code ${address.postal_code} already exists`);
         }
       };
       await processPostalCode(dropoff_address);
 
       const dropoffCoords = await geocodeAddress(dropoff_address);
-      if (!dropoffCoords.lat || !dropoffCoords.lng) {
-        console.log('Geocoding failed for dropoff address:', dropoffCoords);
+      if (!dropoffCoords || !dropoffCoords.lat || !dropoffCoords.lng) {
+        console.error('Geocoding failed for dropoff address:', dropoffCoords);
         await transaction.rollback();
-        return res.status(500).json({ error: 'Geocoding failed for dropoff address' });
+        return res.status(500).json({ error: 'Geocoding failed for dropoff address', details: dropoffCoords });
       }
+
+      // Alleen velden die in de Address tabel bestaan
       const [dropoffAddress] = await Address.findOrCreate({
         where: {
-          street_name: dropoff_address.street_name,
-          house_number: dropoff_address.house_number,
+          street_name: dropoff_address.street_name || 'Unknown',
+          house_number: dropoff_address.house_number || 'Unknown',
           extra_info: dropoff_address.extra_info || null,
           postal_code: dropoff_address.postal_code,
         },
-        defaults: { ...dropoff_address, lat: dropoffCoords.lat, lng: dropoffCoords.lng },
+        defaults: {
+          street_name: dropoff_address.street_name || 'Unknown',
+          house_number: dropoff_address.house_number || 'Unknown',
+          extra_info: dropoff_address.extra_info || null,
+          postal_code: dropoff_address.postal_code,
+          lat: dropoffCoords.lat,
+          lng: dropoffCoords.lng,
+        },
         transaction,
       });
       dropoffAddressId = dropoffAddress.id;
@@ -298,11 +316,16 @@ exports.updatePackage = async (req, res) => {
     }
 
     const updateData = {
-      description,
+      ...(description !== undefined && { description }),
       ...(pickupAddressId && { pickup_address_id: pickupAddressId }),
       ...(dropoffAddressId && { dropoff_address_id: dropoffAddressId }),
       ...(status && { status }),
     };
+
+    if (Object.keys(updateData).length === 0) {
+      await transaction.rollback();
+      return res.status(400).json({ error: 'No valid fields provided to update' });
+    }
 
     const [updated] = await Package.update(
       updateData,
@@ -315,18 +338,44 @@ exports.updatePackage = async (req, res) => {
 
     const updatedPackage = await Package.findByPk(req.params.id, {
       include: [
-        { model: Address, as: 'pickupAddress' },
-        { model: Address, as: 'dropoffAddress' },
+        {
+          model: Address,
+          as: 'pickupAddress',
+          include: [{ model: PostalCode, as: 'postalCodeDetails', attributes: ['city', 'country'] }],
+        },
+        {
+          model: Address,
+          as: 'dropoffAddress',
+          include: [{ model: PostalCode, as: 'postalCodeDetails', attributes: ['city', 'country'] }],
+        },
       ],
       transaction,
     });
 
     await transaction.commit();
     console.log('Package updated:', updatedPackage.toJSON());
-    res.json(updatedPackage);
+
+    // Transformeer de response zoals in getPackageById
+    const transformedPackage = {
+      ...updatedPackage.toJSON(),
+      pickupAddress: updatedPackage.pickupAddress ? {
+        ...updatedPackage.pickupAddress.toJSON(),
+        city: updatedPackage.pickupAddress.postalCodeDetails?.city || null,
+        country: updatedPackage.pickupAddress.postalCodeDetails?.country || null,
+      } : null,
+      dropoffAddress: updatedPackage.dropoffAddress ? {
+        ...updatedPackage.dropoffAddress.toJSON(),
+        city: updatedPackage.dropoffAddress.postalCodeDetails?.city || null,
+        country: updatedPackage.dropoffAddress.postalCodeDetails?.country || null,
+      } : null,
+    };
+    delete transformedPackage.pickupAddress?.postalCodeDetails;
+    delete transformedPackage.dropoffAddress?.postalCodeDetails;
+
+    res.json(transformedPackage);
   } catch (err) {
     await transaction.rollback();
-    console.error('Error updating package:', err.message);
+    console.error('Error updating package:', err.message, err.stack);
     res.status(500).json({ error: 'Error updating package', details: err.message });
   }
 };
