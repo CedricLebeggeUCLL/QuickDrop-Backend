@@ -703,8 +703,28 @@ exports.searchPackages = async (req, res) => {
     const packages = await Package.findAll({
       where: { status: 'pending' },
       include: [
-        { model: Address, as: 'pickupAddress' },
-        { model: Address, as: 'dropoffAddress' },
+        {
+          model: Address,
+          as: 'pickupAddress',
+          include: [
+            {
+              model: PostalCode,
+              as: 'postalCodeDetails',
+              attributes: ['city', 'country'],
+            },
+          ],
+        },
+        {
+          model: Address,
+          as: 'dropoffAddress',
+          include: [
+            {
+              model: PostalCode,
+              as: 'postalCodeDetails',
+              attributes: ['city', 'country'],
+            },
+          ],
+        },
       ],
     });
 
@@ -730,8 +750,32 @@ exports.searchPackages = async (req, res) => {
       }
     }
 
+    // Transformeer de data om city en country toe te voegen
+    const transformedPackages = matchingPackages.map(pkg => {
+      const pkgJson = pkg.toJSON();
+      return {
+        ...pkgJson,
+        pickupAddress: {
+          ...pkgJson.pickupAddress,
+          city: pkgJson.pickupAddress.postalCodeDetails?.city || null,
+          country: pkgJson.pickupAddress.postalCodeDetails?.country || null,
+        },
+        dropoffAddress: {
+          ...pkgJson.dropoffAddress,
+          city: pkgJson.dropoffAddress.postalCodeDetails?.city || null,
+          country: pkgJson.dropoffAddress.postalCodeDetails?.country || null,
+        },
+      };
+    });
+
+    // Verwijder postalCodeDetails uit de response
+    transformedPackages.forEach(pkg => {
+      delete pkg.pickupAddress.postalCodeDetails;
+      delete pkg.dropoffAddress.postalCodeDetails;
+    });
+
     await transaction.commit();
-    res.json({ message: 'Packages found', packages: matchingPackages });
+    res.json({ message: 'Packages found', packages: transformedPackages });
   } catch (err) {
     await transaction.rollback();
     console.error('Search packages error:', err.message);
