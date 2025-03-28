@@ -27,12 +27,52 @@ exports.getPackageById = async (req, res) => {
   try {
     const packageItem = await Package.findByPk(req.params.id, {
       include: [
-        { model: Address, as: 'pickupAddress' },
-        { model: Address, as: 'dropoffAddress' },
+        {
+          model: Address,
+          as: 'pickupAddress',
+          include: [
+            {
+              model: PostalCode,
+              as: 'postalCodeDetails', // Alias voor de relatie
+              attributes: ['city', 'country'], // Alleen deze velden ophalen
+            },
+          ],
+        },
+        {
+          model: Address,
+          as: 'dropoffAddress',
+          include: [
+            {
+              model: PostalCode,
+              as: 'postalCodeDetails', // Alias voor de relatie
+              attributes: ['city', 'country'], // Alleen deze velden ophalen
+            },
+          ],
+        },
       ],
     });
     if (!packageItem) return res.status(404).json({ error: 'Package not found' });
-    res.json(packageItem);
+
+    // Transformeer de response om city en country direct in pickupAddress en dropoffAddress te zetten
+    const transformedPackage = {
+      ...packageItem.toJSON(),
+      pickupAddress: {
+        ...packageItem.pickupAddress.toJSON(),
+        city: packageItem.pickupAddress.postalCodeDetails?.city || null,
+        country: packageItem.pickupAddress.postalCodeDetails?.country || null,
+      },
+      dropoffAddress: {
+        ...packageItem.dropoffAddress.toJSON(),
+        city: packageItem.dropoffAddress.postalCodeDetails?.city || null,
+        country: packageItem.dropoffAddress.postalCodeDetails?.country || null,
+      },
+    };
+
+    // Verwijder de postalCodeDetails objecten uit de response
+    delete transformedPackage.pickupAddress.postalCodeDetails;
+    delete transformedPackage.dropoffAddress.postalCodeDetails;
+
+    res.json(transformedPackage);
   } catch (err) {
     console.error('Error fetching package:', err.message);
     res.status(500).json({ error: 'Error fetching package', details: err.message });
