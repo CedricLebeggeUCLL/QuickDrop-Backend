@@ -584,6 +584,10 @@ exports.searchPackages = async (req, res) => {
     return res.status(400).json({ error: 'City and country are required for both start and destination addresses' });
   }
 
+  if (!userId || userId <= 0) {
+    return res.status(400).json({ error: 'Invalid user_id' });
+  }
+
   start_address.extra_info = start_address.extra_info !== undefined ? start_address.extra_info : null;
   destination_address.extra_info = destination_address.extra_info !== undefined ? destination_address.extra_info : null;
 
@@ -700,8 +704,12 @@ exports.searchPackages = async (req, res) => {
       destination_address_id: destAddress.id,
     }, { transaction });
 
+    // Haal pakketten op, maar sluit pakketten uit die door de koerier zelf zijn aangemaakt
     const packages = await Package.findAll({
-      where: { status: 'pending' },
+      where: {
+        status: 'pending',
+        user_id: { [sequelize.Op.ne]: userId }, // Sluit pakketten uit waar user_id overeenkomt met de koerier
+      },
       include: [
         {
           model: Address,
