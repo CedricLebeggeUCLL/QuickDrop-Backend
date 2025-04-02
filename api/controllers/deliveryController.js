@@ -84,71 +84,71 @@ exports.getDeliveries = async (req, res) => {
 
 exports.getDeliveryById = async (req, res) => {
   try {
-    const delivery = await Delivery.findByPk(req.params.id, {
-      include: [
-        {
-          model: Package,
+      const delivery = await Delivery.findByPk(req.params.id, {
           include: [
-            { model: Address, as: 'pickupAddress' },
-            { model: Address, as: 'dropoffAddress' },
+              {
+                  model: Package,
+                  include: [
+                      { model: Address, as: 'pickupAddress' },
+                      { model: Address, as: 'dropoffAddress' },
+                  ],
+              },
+              {
+                  model: Courier,
+                  include: [
+                      { model: Address, as: 'currentAddress' },
+                      { model: Address, as: 'startAddress' },
+                      { model: Address, as: 'destinationAddress' },
+                  ],
+              },
+              {
+                  model: Address,
+                  as: 'pickupAddress',
+                  include: [
+                      {
+                          model: PostalCode,
+                          as: 'postalCodeDetails',
+                          attributes: ['city', 'country'],
+                      },
+                  ],
+              },
+              {
+                  model: Address,
+                  as: 'dropoffAddress',
+                  include: [
+                      {
+                          model: PostalCode,
+                          as: 'postalCodeDetails',
+                          attributes: ['city', 'country'],
+                      },
+                  ],
+              },
           ],
-        },
-        {
-          model: Courier,
-          include: [
-            { model: Address, as: 'currentAddress' },
-            { model: Address, as: 'startAddress' },
-            { model: Address, as: 'destinationAddress' },
-          ],
-        },
-        {
-          model: Address,
-          as: 'pickupAddress',
-          include: [
-            {
-              model: PostalCode,
-              as: 'postalCodeDetails',
-              attributes: ['city', 'country'],
-            },
-          ],
-        },
-        {
-          model: Address,
-          as: 'dropoffAddress',
-          include: [
-            {
-              model: PostalCode,
-              as: 'postalCodeDetails',
-              attributes: ['city', 'country'],
-            },
-          ],
-        },
-      ],
-    });
+      });
 
-    if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
+      if (!delivery) return res.status(404).json({ error: 'Delivery not found' });
 
-    const transformedDelivery = {
-      ...delivery.toJSON(),
-      pickupAddress: {
-        ...delivery.pickupAddress.toJSON(),
-        city: delivery.pickupAddress.postalCodeDetails?.city || null,
-        country: delivery.pickupAddress.postalCodeDetails?.country || null,
-      },
-      dropoffAddress: {
-        ...delivery.dropoffAddress.toJSON(),
-        city: delivery.dropoffAddress.postalCodeDetails?.city || null,
-        country: delivery.dropoffAddress.postalCodeDetails?.country || null,
-      },
-    };
+      const transformedDelivery = {
+          ...delivery.toJSON(),
+          pickupAddress: {
+              ...delivery.pickupAddress.toJSON(),
+              city: delivery.pickupAddress.postalCodeDetails?.city || null,
+              country: delivery.pickupAddress.postalCodeDetails?.country || null,
+          },
+          dropoffAddress: {
+              ...delivery.dropoffAddress.toJSON(),
+              city: delivery.dropoffAddress.postalCodeDetails?.city || null,
+              country: delivery.dropoffAddress.postalCodeDetails?.country || null,
+          },
+      };
 
-    delete transformedDelivery.pickupAddress.postalCodeDetails;
-    delete transformedDelivery.dropoffAddress.postalCodeDetails;
+      delete transformedDelivery.pickupAddress.postalCodeDetails;
+      delete transformedDelivery.dropoffAddress.postalCodeDetails;
 
-    res.json(transformedDelivery);
+      res.json(transformedDelivery);
   } catch (err) {
-    console.error('Error fetching delivery:', err.message);
-    res.status(500).json({ error: 'Error fetching delivery', details: err.message });
+      console.error('Error fetching delivery:', err.message);
+      res.status(500).json({ error: 'Error fetching delivery', details: err.message });
   }
 };
 
