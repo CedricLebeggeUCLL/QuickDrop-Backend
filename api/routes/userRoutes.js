@@ -1,13 +1,17 @@
 const express = require('express');
 const router = express.Router();
 const userController = require('../controllers/userController');
+const authMiddleware = require('../../utils/authMiddleware');
 
-router.get('/', userController.getUsers); // Alle gebruikers ophalen
-router.get('/:id', userController.getUserById); // Een specifieke gebruiker ophalen
-router.post('/', userController.createUser); // Nieuwe gebruiker aanmaken
-router.put('/:id', userController.updateUser); // Gebruiker bijwerken
-router.delete('/:id', userController.deleteUser); // Gebruiker verwijderen
-router.post('/register', userController.registerUser); // Gebruiker registreren
-router.post('/login', userController.loginUser); // Gebruiker inloggen
+// Publieke routes
+router.post('/register', userController.registerUser);
+router.post('/login', userController.loginUser);
+
+// Beschermde routes
+router.get('/', authMiddleware, userController.getUsers);
+router.get('/:id', authMiddleware, userController.getUserById);
+router.post('/', authMiddleware, userController.createUser);
+router.put('/:id', authMiddleware, userController.updateUser);
+router.delete('/:id', authMiddleware, userController.deleteUser);
 
 module.exports = router;

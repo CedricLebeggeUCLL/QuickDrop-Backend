@@ -1,7 +1,8 @@
 const express = require('express');
 const dotenv = require('dotenv');
 const { sequelize, testConnection } = require('./db');
-const cors = require('cors'); // Voeg CORS toe
+const cors = require('cors');
+const authMiddleware = require('../utils/authMiddleware');
 
 dotenv.config({ path: '../.env' });
 
@@ -10,7 +11,7 @@ const port = process.env.PORT || 3000;
 
 // Middleware
 app.use(express.json());
-app.use(cors()); // Sta CORS toe voor alle origins (pas aan voor productie)
+app.use(cors());
 
 // Error handling middleware
 app.use((err, req, res, next) => {
@@ -26,12 +27,11 @@ const deliveryRoutes = require('./routes/deliveryRoutes');
 const addressRoutes = require('./routes/addressRoutes');
 
 app.use('/api/users', userRoutes);
-app.use('/api/packages', packageRoutes);
-app.use('/api/couriers', courierRoutes);
-app.use('/api/deliveries', deliveryRoutes);
+app.use('/api/packages', authMiddleware, packageRoutes); // Beschermde route
+app.use('/api/couriers', authMiddleware, courierRoutes); // Beschermde route
+app.use('/api/deliveries', authMiddleware, deliveryRoutes); // Beschermde route
 app.use('/api/addresses', addressRoutes);
 
-// Start de server
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server luistert op poort ${port}`);
 });

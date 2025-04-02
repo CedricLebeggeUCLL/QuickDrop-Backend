@@ -111,13 +111,13 @@ INSERT INTO addresses (street_name, house_number, extra_info, postal_code, lat, 
 ('Sliksteenvest', '20', NULL, '3300', 50.8106101, 4.947437), -- Tienen
 ('Beemdstraat', '30', NULL, '1910', 50.95382, 4.5666648); -- Kampenhout
 
--- Insert sample users
+-- Insert sample users with bcrypt-hashed passwords
 INSERT INTO users (username, email, password, role) VALUES
-('johndoe', 'john@example.com', 'hashed_password1', 'user'),
-('janedoe', 'jane@example.com', 'hashed_password2', 'user'),
-('bobsmith', 'bob@example.com', 'hashed_password3', 'courier'),
-('adminuser', 'admin@quickdrop.com', 'hashed_password4', 'admin'),
-('cedric', 'cedric@example.com', 'hashed_password5', 'user');
+('johndoe', 'john@example.com', '$2b$10$kAy0Kxw5493cEH9sau8zg.ABKWDQ8yWtI0q7Ta2za9n7H00LKgK9y', 'user'),
+('janedoe', 'jane@example.com', '$2b$10$eKOUnYWvM9dF4Uo9krWScON3ZXMUn/aIMTyO4d7ARfPhBRIlSenUG', 'user'),
+('bobsmith', 'bob@example.com', '$2b$10$fMoOTioPa.esGnYX0daOKekCp.aTutJzq3oZssoUIJSd51gxe6t.C', 'courier'),
+('adminuser', 'admin@quickdrop.com', '$2b$10$rXlsB9m8zl.yYcgujJg48OZMm.kVdZItHiPxyjB.PElMDo1mCVB0m', 'admin'),
+('cedric', 'cedric@example.com', '$2b$10$P2PcEmK.HXjnYnIso5qBt.zHfNruztJUY/OWh6XhuAdwgN9Gq9DFu', 'user');
 
 -- Insert sample packages
 SET @pickup_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Rue de la Loi' AND house_number = '100');
