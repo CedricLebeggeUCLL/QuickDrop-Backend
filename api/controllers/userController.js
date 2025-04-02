@@ -2,8 +2,10 @@ const { sequelize } = require('../db');
 const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
+const crypto = require('crypto'); // For generating random refresh tokens
 
-const JWT_SECRET = process.env.JWT_SECRET || 'jouw_geheime_sleutel'; // Zet dit in je .env-bestand
+const JWT_SECRET = process.env.JWT_SECRET || 'jouw_geheime_sleutel';
+const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your_refresh_token_secret';
 
 exports.getUsers = async (req, res) => {
   try {
@@ -79,10 +81,34 @@ exports.loginUser = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Ongeldig wachtwoord' });
 
-    const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-    res.status(200).json({ userId: user.id, token });
+    // Generate access token
+    const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+
+    // Generate refresh token (random string)
+    const refreshToken = crypto.randomBytes(32).toString('hex');
+    user.refreshToken = refreshToken;
+    await user.save();
+
+    res.status(200).json({ userId: user.id, accessToken, refreshToken });
   } catch (err) {
     console.error('Login error:', err.message);
     res.status(500).json({ error: 'Fout bij login', details: err.message });
+  }
+};
+
+exports.refreshToken = async (req, res) => {
+  const { refreshToken } = req.body;
+  if (!refreshToken) return res.status(401).json({ error: 'Refresh token vereist' });
+
+  try {
+    const user = await User.findOne({ where: { refreshToken } });
+    if (!user) return res.status(403).json({ error: 'Ongeldig refresh token' });
+
+    // Generate new access token
+    const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+
+    res.status(200).json({ accessToken });
+  } catch (err) {
+    res.status(500).json({ error: 'Fout bij het vernieuwen van token', details: err.message });
   }
 };
