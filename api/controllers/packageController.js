@@ -1,4 +1,5 @@
 const { sequelize } = require('../db');
+const { Op } = require('sequelize');
 const { haversineDistance } = require('../../utils/distance');
 const { geocodeAddress } = require('../../utils/geocode');
 const Package = require('../models/package');
@@ -702,7 +703,10 @@ exports.searchPackages = async (req, res) => {
 
     // Haal pakketten op, maar sluit pakketten uit die door de koerier zelf zijn aangemaakt
     const packages = await Package.findAll({
-      where: {status: 'pending'},
+      where: {
+        status: 'pending',
+        user_id: { [Op.ne]: userId }
+      },
       include: [
         {
           model: Address,
