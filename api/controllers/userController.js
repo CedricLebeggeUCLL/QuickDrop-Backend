@@ -1,8 +1,10 @@
 const { sequelize } = require('../db');
+const { Sequelize } = require('sequelize'); // Import Sequelize class
+const Op = Sequelize.Op; // Extract Op for operators
 const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
-const crypto = require('crypto'); // For generating random refresh tokens
+const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../../utils/emailService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'jouw_geheime_sleutel';
@@ -82,10 +84,7 @@ exports.loginUser = async (req, res) => {
     const isMatch = await bcrypt.compare(password, user.password);
     if (!isMatch) return res.status(401).json({ error: 'Ongeldig wachtwoord' });
 
-    // Generate access token
     const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-
-    // Generate refresh token (random string)
     const refreshToken = crypto.randomBytes(32).toString('hex');
     user.refreshToken = refreshToken;
     await user.save();
@@ -105,16 +104,13 @@ exports.refreshToken = async (req, res) => {
     const user = await User.findOne({ where: { refreshToken } });
     if (!user) return res.status(403).json({ error: 'Ongeldig refresh token' });
 
-    // Generate new access token
     const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-
     res.status(200).json({ accessToken });
   } catch (err) {
     res.status(500).json({ error: 'Fout bij het vernieuwen van token', details: err.message });
   }
 };
 
-// Nieuwe functie: Wachtwoordherstel aanvragen
 exports.forgotPassword = async (req, res) => {
   const { email } = req.body;
   try {
@@ -123,25 +119,20 @@ exports.forgotPassword = async (req, res) => {
       return res.status(404).json({ error: 'Geen gebruiker gevonden met dit e-mailadres' });
     }
 
-    // Genereer een reset-token
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = Date.now() + 3600000; // 1 uur geldig
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
 
-    // Sla de token en vervaldatum op in de database
     user.resetToken = resetToken;
     user.resetTokenExpiry = resetTokenExpiry;
     await user.save();
 
-    // Verstuur de e-mail
     await sendPasswordResetEmail(email, resetToken);
-
     res.status(200).json({ message: 'Wachtwoordherstel-e-mail verzonden' });
   } catch (err) {
     res.status(500).json({ error: 'Fout bij het aanvragen van wachtwoordherstel', details: err.message });
   }
 };
 
-// Nieuwe functie: Wachtwoord resetten
 exports.resetPassword = async (req, res) => {
   const { token } = req.params;
   const { newPassword } = req.body;
@@ -149,16 +140,15 @@ exports.resetPassword = async (req, res) => {
     const user = await User.findOne({
       where: {
         resetToken: token,
-        resetTokenExpiry: { [sequelize.Op.gt]: Date.now() }, // Controleer of token niet verlopen is
-      },
+        resetTokenExpiry: { [Op.gt]: new Date() } // Compare with current time
+      }
     });
 
     if (!user) {
       return res.status(400).json({ error: 'Ongeldige of verlopen reset-token' });
     }
 
-    // Update het wachtwoord
-    user.password = newPassword; // bcrypt hash wordt automatisch toegepast via model hook
+    user.password = newPassword; // Will be hashed by the beforeUpdate hook
     user.resetToken = null;
     user.resetTokenExpiry = null;
     await user.save();

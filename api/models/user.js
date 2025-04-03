@@ -30,11 +30,11 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  resetToken: { // Nieuw veld voor reset-token
+  resetToken: {
     type: DataTypes.STRING(255),
     allowNull: true
   },
-  resetTokenExpiry: { // Nieuw veld voor vervaldatum
+  resetTokenExpiry: {
     type: DataTypes.DATE,
     allowNull: true
   }
