@@ -30,7 +30,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/packages', authMiddleware, packageRoutes); // Beschermde route
 app.use('/api/couriers', authMiddleware, courierRoutes); // Beschermde route
 app.use('/api/deliveries', authMiddleware, deliveryRoutes); // Beschermde route
-app.use('/api/addresses', addressRoutes);
+app.use('/api/addresses', authMiddleware, addressRoutes); // Nu ook beschermd
 
 app.listen(port, '0.0.0.0', () => {
   console.log(`Server luistert op poort ${port}`);
