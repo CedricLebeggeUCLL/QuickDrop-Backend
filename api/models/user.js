@@ -29,6 +29,14 @@ const User = sequelize.define('User', {
   refreshToken: {
     type: DataTypes.STRING(255),
     allowNull: true
+  },
+  resetToken: { // Nieuw veld voor reset-token
+    type: DataTypes.STRING(255),
+    allowNull: true
+  },
+  resetTokenExpiry: { // Nieuw veld voor vervaldatum
+    type: DataTypes.DATE,
+    allowNull: true
   }
 }, {
   tableName: 'users',

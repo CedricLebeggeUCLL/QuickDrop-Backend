@@ -3,6 +3,7 @@ const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto'); // For generating random refresh tokens
+const { sendPasswordResetEmail } = require('../../utils/emailService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'jouw_geheime_sleutel';
 const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your_refresh_token_secret';
@@ -110,5 +111,60 @@ exports.refreshToken = async (req, res) => {
     res.status(200).json({ accessToken });
   } catch (err) {
     res.status(500).json({ error: 'Fout bij het vernieuwen van token', details: err.message });
+  }
+};
+
+// Nieuwe functie: Wachtwoordherstel aanvragen
+exports.forgotPassword = async (req, res) => {
+  const { email } = req.body;
+  try {
+    const user = await User.findOne({ where: { email } });
+    if (!user) {
+      return res.status(404).json({ error: 'Geen gebruiker gevonden met dit e-mailadres' });
+    }
+
+    // Genereer een reset-token
+    const resetToken = crypto.randomBytes(32).toString('hex');
+    const resetTokenExpiry = Date.now() + 3600000; // 1 uur geldig
+
+    // Sla de token en vervaldatum op in de database
+    user.resetToken = resetToken;
+    user.resetTokenExpiry = resetTokenExpiry;
+    await user.save();
+
+    // Verstuur de e-mail
+    await sendPasswordResetEmail(email, resetToken);
+
+    res.status(200).json({ message: 'Wachtwoordherstel-e-mail verzonden' });
+  } catch (err) {
+    res.status(500).json({ error: 'Fout bij het aanvragen van wachtwoordherstel', details: err.message });
+  }
+};
+
+// Nieuwe functie: Wachtwoord resetten
+exports.resetPassword = async (req, res) => {
+  const { token } = req.params;
+  const { newPassword } = req.body;
+  try {
+    const user = await User.findOne({
+      where: {
+        resetToken: token,
+        resetTokenExpiry: { [sequelize.Op.gt]: Date.now() }, // Controleer of token niet verlopen is
+      },
+    });
+
+    if (!user) {
+      return res.status(400).json({ error: 'Ongeldige of verlopen reset-token' });
+    }
+
+    // Update het wachtwoord
+    user.password = newPassword; // bcrypt hash wordt automatisch toegepast via model hook
+    user.resetToken = null;
+    user.resetTokenExpiry = null;
+    await user.save();
+
+    res.status(200).json({ message: 'Wachtwoord succesvol gereset' });
+  } catch (err) {
+    res.status(500).json({ error: 'Fout bij het resetten van wachtwoord', details: err.message });
   }
 };

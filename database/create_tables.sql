@@ -41,7 +41,9 @@ CREATE TABLE users (
   email VARCHAR(100) NOT NULL UNIQUE,
   password VARCHAR(255) NOT NULL,
   role ENUM('user', 'courier', 'admin') DEFAULT 'user',
-  refreshToken VARCHAR(255) DEFAULT NULL -- Added refreshToken column
+  refreshToken VARCHAR(255) DEFAULT NULL,
+  resetToken VARCHAR(255) DEFAULT NULL, -- Nieuw veld voor reset-token
+  resetTokenExpiry DATETIME DEFAULT NULL -- Nieuw veld voor vervaldatum
 );
 
 -- Packages table
@@ -103,14 +105,14 @@ INSERT INTO postal_codes (code, city, country) VALUES
 
 -- Insert sample addresses with coordinates
 INSERT INTO addresses (street_name, house_number, extra_info, postal_code, lat, lng) VALUES
-('Rue de la Loi', '100', NULL, '1000', 50.8442333, 4.375933), -- Brussels
-('Meir', '50', NULL, '2000', 51.2182, 4.4051), -- Antwerp
-('Boulevard Anspach', '20', 'Apt 5', '1000', 50.847647, 4.350648), -- Brussels
-('Beemdstraat', '8', NULL, '1910', 50.9546577, 4.5623148), -- Kampenhout
-('Sliksteenvest', '5', NULL, '3300', 50.8111583, 4.944302), -- Tienen
-('Beemdstraat', '20', NULL, '1910', 50.9544901, 4.5650759), -- Kampenhout
-('Sliksteenvest', '20', NULL, '3300', 50.8106101, 4.947437), -- Tienen
-('Beemdstraat', '30', NULL, '1910', 50.95382, 4.5666648); -- Kampenhout
+('Rue de la Loi', '100', NULL, '1000', 50.8442333, 4.375933),
+('Meir', '50', NULL, '2000', 51.2182, 4.4051),
+('Boulevard Anspach', '20', 'Apt 5', '1000', 50.847647, 4.350648),
+('Beemdstraat', '8', NULL, '1910', 50.9546577, 4.5623148),
+('Sliksteenvest', '5', NULL, '3300', 50.8111583, 4.944302),
+('Beemdstraat', '20', NULL, '1910', 50.9544901, 4.5650759),
+('Sliksteenvest', '20', NULL, '3300', 50.8106101, 4.947437),
+('Beemdstraat', '30', NULL, '1910', 50.95382, 4.5666648);
 
 -- Insert sample users with bcrypt-hashed passwords
 INSERT INTO users (username, email, password, role) VALUES
