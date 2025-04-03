@@ -10,8 +10,8 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendPasswordResetEmail = async (email, resetToken) => {
-  // Wijs naar de frontend-URL in plaats van de backend
-  const resetUrl = `http://your-app-domain/resetPassword/${resetToken}`; // Pas aan naar je app-URL, bijv. een deep link
+  // Gebruik de deep link URL voor de app
+  const resetUrl = `quickdrop://resetPassword/${resetToken}`;
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
