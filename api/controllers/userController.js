@@ -1,6 +1,6 @@
 const { sequelize } = require('../db');
-const { Sequelize } = require('sequelize'); // Import Sequelize class
-const Op = Sequelize.Op; // Extract Op for operators
+const { Sequelize } = require('sequelize');
+const Op = Sequelize.Op;
 const User = require('../models/user');
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
@@ -8,7 +8,7 @@ const crypto = require('crypto');
 const { sendPasswordResetEmail } = require('../../utils/emailService');
 
 const JWT_SECRET = process.env.JWT_SECRET || 'jouw_geheime_sleutel';
-const REFRESH_TOKEN_SECRET = process.env.REFRESH_TOKEN_SECRET || 'your_refresh_token_secret';
+const REFRESH_TOKEN_EXPIRY = 7 * 24 * 60 * 60 * 1000; // 7 dagen in milliseconden
 
 exports.getUsers = async (req, res) => {
   try {
@@ -87,6 +87,7 @@ exports.loginUser = async (req, res) => {
     const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
     const refreshToken = crypto.randomBytes(32).toString('hex');
     user.refreshToken = refreshToken;
+    user.refreshTokenExpiry = new Date(Date.now() + REFRESH_TOKEN_EXPIRY);
     await user.save();
 
     res.status(200).json({ userId: user.id, accessToken, refreshToken });
@@ -98,16 +99,36 @@ exports.loginUser = async (req, res) => {
 
 exports.refreshToken = async (req, res) => {
   const { refreshToken } = req.body;
-  if (!refreshToken) return res.status(401).json({ error: 'Refresh token vereist' });
+  if (!refreshToken) {
+      console.log('Geen refresh token meegegeven');
+      return res.status(401).json({ error: 'Refresh token vereist' });
+  }
 
   try {
-    const user = await User.findOne({ where: { refreshToken } });
-    if (!user) return res.status(403).json({ error: 'Ongeldig refresh token' });
+      console.log('Ontvangen refreshToken:', refreshToken);
+      const user = await User.findOne({
+          where: {
+              refreshToken,
+              refreshTokenExpiry: { [Op.gt]: new Date() }
+          }
+      });
+      if (!user) {
+          console.log('Geen gebruiker gevonden met deze refresh token of token verlopen');
+          return res.status(403).json({ error: 'Ongeldig of verlopen refresh token' });
+      }
 
-    const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
-    res.status(200).json({ accessToken });
+      const accessToken = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1h' });
+      const newRefreshToken = crypto.randomBytes(32).toString('hex');
+      user.refreshToken = newRefreshToken;
+      user.refreshTokenExpiry = new Date(Date.now() + REFRESH_TOKEN_EXPIRY);
+      await user.save();
+
+      const response = { accessToken, refreshToken: newRefreshToken };
+      console.log('Refresh token response:', response);
+      res.status(200).json(response);
   } catch (err) {
-    res.status(500).json({ error: 'Fout bij het vernieuwen van token', details: err.message });
+      console.error('Refresh token error:', err.message);
+      res.status(500).json({ error: 'Fout bij het vernieuwen van token', details: err.message });
   }
 };
 
@@ -120,8 +141,7 @@ exports.forgotPassword = async (req, res) => {
     }
 
     const resetToken = crypto.randomBytes(32).toString('hex');
-    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 hour from now
-
+    const resetTokenExpiry = new Date(Date.now() + 3600000); // 1 uur
     user.resetToken = resetToken;
     user.resetTokenExpiry = resetTokenExpiry;
     await user.save();
@@ -140,7 +160,7 @@ exports.resetPassword = async (req, res) => {
     const user = await User.findOne({
       where: {
         resetToken: token,
-        resetTokenExpiry: { [Op.gt]: new Date() } // Compare with current time
+        resetTokenExpiry: { [Op.gt]: new Date() }
       }
     });
 
@@ -148,7 +168,7 @@ exports.resetPassword = async (req, res) => {
       return res.status(400).json({ error: 'Ongeldige of verlopen reset-token' });
     }
 
-    user.password = newPassword; // Will be hashed by the beforeUpdate hook
+    user.password = newPassword;
     user.resetToken = null;
     user.resetTokenExpiry = null;
     await user.save();

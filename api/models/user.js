@@ -30,6 +30,10 @@ const User = sequelize.define('User', {
     type: DataTypes.STRING(255),
     allowNull: true
   },
+  refreshTokenExpiry: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
   resetToken: {
     type: DataTypes.STRING(255),
     allowNull: true

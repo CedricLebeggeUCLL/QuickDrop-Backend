@@ -34,7 +34,7 @@ CREATE TABLE addresses (
   FOREIGN KEY (postal_code) REFERENCES postal_codes(code) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
--- Users table
+-- Users table (met refreshTokenExpiry toegevoegd)
 CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(50) NOT NULL UNIQUE,
@@ -42,6 +42,7 @@ CREATE TABLE users (
   password VARCHAR(255) NOT NULL,
   role ENUM('user', 'courier', 'admin') DEFAULT 'user',
   refreshToken VARCHAR(255) DEFAULT NULL,
+  refreshTokenExpiry DATETIME DEFAULT NULL, -- Toegevoegd
   resetToken VARCHAR(255) DEFAULT NULL,
   resetTokenExpiry DATETIME DEFAULT NULL
 );
@@ -118,12 +119,12 @@ INSERT INTO addresses (street_name, house_number, extra_info, postal_code, lat, 
 ('Beemdstraat', '30', NULL, '1910', 50.95382, 4.5666648);
 
 -- Insert sample users with bcrypt-hashed passwords
-INSERT INTO users (username, email, password, role) VALUES
-('johndoe', 'john@example.com', '$2b$10$kAy0Kxw5493cEH9sau8zg.ABKWDQ8yWtI0q7Ta2za9n7H00LKgK9y', 'user'),
-('janedoe', 'jane@example.com', '$2b$10$eKOUnYWvM9dF4Uo9krWScON3ZXMUn/aIMTyO4d7ARfPhBRIlSenUG', 'user'),
-('bobsmith', 'bob@example.com', '$2b$10$fMoOTioPa.esGnYX0daOKekCp.aTutJzq3oZssoUIJSd51gxe6t.C', 'courier'),
-('adminuser', 'admin@quickdrop.com', '$2b$10$rXlsB9m8zl.yYcgujJg48OZMm.kVdZItHiPxyjB.PElMDo1mCVB0m', 'admin'),
-('cedric', 'cedric@example.com', '$2b$10$P2PcEmK.HXjnYnIso5qBt.zHfNruztJUY/OWh6XhuAdwgN9Gq9DFu', 'user');
+INSERT INTO users (username, email, password, role, refreshToken, refreshTokenExpiry) VALUES
+('johndoe', 'john@example.com', '$2b$10$kAy0Kxw5493cEH9sau8zg.ABKWDQ8yWtI0q7Ta2za9n7H00LKgK9y', 'user', NULL, NULL),
+('janedoe', 'jane@example.com', '$2b$10$eKOUnYWvM9dF4Uo9krWScON3ZXMUn/aIMTyO4d7ARfPhBRIlSenUG', 'user', NULL, NULL),
+('bobsmith', 'bob@example.com', '$2b$10$fMoOTioPa.esGnYX0daOKekCp.aTutJzq3oZssoUIJSd51gxe6t.C', 'courier', NULL, NULL),
+('adminuser', 'admin@quickdrop.com', '$2b$10$rXlsB9m8zl.yYcgujJg48OZMm.kVdZItHiPxyjB.PElMDo1mCVB0m', 'admin', NULL, NULL),
+('cedric', 'cedric@example.com', '$2b$10$P2PcEmK.HXjnYnIso5qBt.zHfNruztJUY/OWh6XhuAdwgN9Gq9DFu', 'user', NULL, NULL);
 
 -- Insert sample packages (met nieuwe velden)
 SET @pickup_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Rue de la Loi' AND house_number = '100');
