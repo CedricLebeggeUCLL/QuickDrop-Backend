@@ -36,6 +36,18 @@ const Package = sequelize.define('Package', {
       key: 'id',
     },
   },
+  action_type: {
+    type: DataTypes.ENUM('send', 'receive'),
+    allowNull: false,
+  },
+  category: {
+    type: DataTypes.ENUM('package', 'food', 'drink'),
+    defaultValue: 'package',
+  },
+  size: {
+    type: DataTypes.ENUM('small', 'medium', 'large'),
+    defaultValue: 'medium',
+  },
   status: {
     type: DataTypes.ENUM('pending', 'assigned', 'in_transit', 'delivered'),
     defaultValue: 'pending',

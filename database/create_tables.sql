@@ -42,17 +42,20 @@ CREATE TABLE users (
   password VARCHAR(255) NOT NULL,
   role ENUM('user', 'courier', 'admin') DEFAULT 'user',
   refreshToken VARCHAR(255) DEFAULT NULL,
-  resetToken VARCHAR(255) DEFAULT NULL, -- Nieuw veld voor reset-token
-  resetTokenExpiry DATETIME DEFAULT NULL -- Nieuw veld voor vervaldatum
+  resetToken VARCHAR(255) DEFAULT NULL,
+  resetTokenExpiry DATETIME DEFAULT NULL
 );
 
--- Packages table
+-- Packages table (met nieuwe velden: action_type, category, size)
 CREATE TABLE packages (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
   description TEXT,
   pickup_address_id INT NOT NULL,
   dropoff_address_id INT NOT NULL,
+  action_type ENUM('send', 'receive') NOT NULL,
+  category ENUM('package', 'food', 'drink') DEFAULT 'package',
+  size ENUM('small', 'medium', 'large') DEFAULT 'medium',
   status ENUM('pending', 'assigned', 'in_transit', 'delivered') DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
@@ -122,7 +125,7 @@ INSERT INTO users (username, email, password, role) VALUES
 ('adminuser', 'admin@quickdrop.com', '$2b$10$rXlsB9m8zl.yYcgujJg48OZMm.kVdZItHiPxyjB.PElMDo1mCVB0m', 'admin'),
 ('cedric', 'cedric@example.com', '$2b$10$P2PcEmK.HXjnYnIso5qBt.zHfNruztJUY/OWh6XhuAdwgN9Gq9DFu', 'user');
 
--- Insert sample packages
+-- Insert sample packages (met nieuwe velden)
 SET @pickup_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Rue de la Loi' AND house_number = '100');
 SET @dropoff_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Meir' AND house_number = '50');
 SET @pickup_addr_id2 = (SELECT id FROM addresses WHERE street_name = 'Beemdstraat' AND house_number = '8');
@@ -130,12 +133,12 @@ SET @dropoff_addr_id2 = (SELECT id FROM addresses WHERE street_name = 'Sliksteen
 SET @pickup_addr_id3 = (SELECT id FROM addresses WHERE street_name = 'Sliksteenvest' AND house_number = '5');
 SET @dropoff_addr_id3 = (SELECT id FROM addresses WHERE street_name = 'Beemdstraat' AND house_number = '30');
 
-INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, status) VALUES
-(1, 'Gift for friend', @pickup_addr_id1, @dropoff_addr_id1, 'pending'),
-(2, 'Study books', @dropoff_addr_id1, @pickup_addr_id1, 'assigned'),
-(3, 'Boeken - Ontvanger: Cedric Lebegge, Gewicht: 5 kg', @pickup_addr_id2, @dropoff_addr_id2, 'pending'),
-(4, 'Speelgoed - Ontvanger: Piet, Gewicht: 1 kg', @pickup_addr_id2, @dropoff_addr_id2, 'pending'),
-(5, 'TV - Ontvanger: Cedric Lebegge, Gewicht: 1 kg', @pickup_addr_id3, @dropoff_addr_id3, 'pending');
+INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, action_type, category, size, status) VALUES
+(1, 'Gift for friend - Ontvanger: Jane Doe', @pickup_addr_id1, @dropoff_addr_id1, 'send', 'package', 'medium', 'pending'),
+(2, 'Study books - Ontvanger: John Smith', @dropoff_addr_id1, @pickup_addr_id1, 'send', 'package', 'medium', 'assigned'),
+(3, 'Boeken - Ontvanger: Cedric Lebegge, Gewicht: 5 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'medium', 'pending'),
+(4, 'Speelgoed - Ontvanger: Piet, Gewicht: 1 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'small', 'pending'),
+(5, 'TV - Ontvanger: Cedric Lebegge, Gewicht: 1 kg', @pickup_addr_id3, @dropoff_addr_id3, 'send', 'package', 'large', 'pending');
 
 -- Get user IDs for couriers
 SET @bobsmith_id = (SELECT id FROM users WHERE username = 'bobsmith');

@@ -188,20 +188,28 @@ exports.getPackagesByUserId = async (req, res) => {
   }
 };
 
-// De rest van de controller (zoals addPackage, updatePackage, etc.) blijft ongewijzigd in deze context
 exports.addPackage = async (req, res) => {
   console.log('Entering addPackage endpoint');
   const userId = req.body.user_id;
-  const { description, pickup_address, dropoff_address } = req.body;
+  const { description, pickup_address, dropoff_address, action_type, category, size } = req.body;
 
   console.log('Create package request received:', JSON.stringify(req.body, null, 2));
 
+  // Validatie van verplichte velden
   if (!pickup_address || !dropoff_address) {
     return res.status(400).json({ error: 'Pickup and dropoff addresses are required' });
   }
-
   if (!userId || userId <= 0) {
     return res.status(400).json({ error: 'Invalid user_id' });
+  }
+  if (!action_type || !['send', 'receive'].includes(action_type)) {
+    return res.status(400).json({ error: 'Invalid action_type, must be "send" or "receive"' });
+  }
+  if (!category || !['package', 'food', 'drink'].includes(category)) {
+    return res.status(400).json({ error: 'Invalid category, must be "package", "food", or "drink"' });
+  }
+  if (!size || !['small', 'medium', 'large'].includes(size)) {
+    return res.status(400).json({ error: 'Invalid size, must be "small", "medium", or "large"' });
   }
 
   const transaction = await sequelize.transaction();
@@ -214,7 +222,7 @@ exports.addPackage = async (req, res) => {
 
     const processPostalCode = async (address) => {
       if (address.postal_code) {
-        const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code } });
+        const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code }, transaction });
         if (!postalCodeExists) {
           console.log(`Adding new postal code: ${address.postal_code}, ${address.city}, ${address.country || 'Belgium'}`);
           await PostalCode.create({
@@ -291,13 +299,62 @@ exports.addPackage = async (req, res) => {
       description,
       pickup_address_id: pickupAddress.id,
       dropoff_address_id: dropoffAddress.id,
+      action_type, // Nieuw veld
+      category, // Nieuw veld
+      size, // Nieuw veld
       status: 'pending',
     }, { transaction });
     console.log('Package created:', packageItem.toJSON());
 
     await transaction.commit();
     console.log('Transaction committed');
-    res.status(201).json({ message: 'Package added successfully', packageId: packageItem.id });
+
+    // Haal het aangemaakte pakket op met alle relaties voor de response
+    const createdPackage = await Package.findByPk(packageItem.id, {
+      include: [
+        {
+          model: Address,
+          as: 'pickupAddress',
+          include: [
+            {
+              model: PostalCode,
+              as: 'postalCodeDetails',
+              attributes: ['city', 'country'],
+            },
+          ],
+        },
+        {
+          model: Address,
+          as: 'dropoffAddress',
+          include: [
+            {
+              model: PostalCode,
+              as: 'postalCodeDetails',
+              attributes: ['city', 'country'],
+            },
+          ],
+        },
+      ],
+    });
+
+    const transformedPackage = {
+      ...createdPackage.toJSON(),
+      pickupAddress: {
+        ...createdPackage.pickupAddress.toJSON(),
+        city: createdPackage.pickupAddress.postalCodeDetails?.city || null,
+        country: createdPackage.pickupAddress.postalCodeDetails?.country || null,
+      },
+      dropoffAddress: {
+        ...createdPackage.dropoffAddress.toJSON(),
+        city: createdPackage.dropoffAddress.postalCodeDetails?.city || null,
+        country: createdPackage.dropoffAddress.postalCodeDetails?.country || null,
+      },
+    };
+
+    delete transformedPackage.pickupAddress.postalCodeDetails;
+    delete transformedPackage.dropoffAddress.postalCodeDetails;
+
+    res.status(201).json(transformedPackage);
   } catch (err) {
     await transaction.rollback();
     console.error('Error adding package:', err.message);
@@ -310,7 +367,7 @@ exports.addPackage = async (req, res) => {
 };
 
 exports.updatePackage = async (req, res) => {
-  const { description, pickup_address, dropoff_address, status } = req.body;
+  const { description, pickup_address, dropoff_address, action_type, category, size, status } = req.body;
   const transaction = await sequelize.transaction();
   try {
     let pickupAddressId, dropoffAddressId;
@@ -323,7 +380,7 @@ exports.updatePackage = async (req, res) => {
           return res.status(400).json({ error: 'Postal code is required for pickup address' });
         }
 
-        const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code } });
+        const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code }, transaction });
         if (!postalCodeExists) {
           console.log(`Adding new postal code: ${address.postal_code}, ${address.city || 'Unknown'}, ${address.country || 'Belgium'}`);
           await PostalCode.create({
@@ -374,7 +431,7 @@ exports.updatePackage = async (req, res) => {
           return res.status(400).json({ error: 'Postal code is required for dropoff address' });
         }
 
-        const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code } });
+        const postalCodeExists = await PostalCode.findOne({ where: { code: address.postal_code }, transaction });
         if (!postalCodeExists) {
           console.log(`Adding new postal code: ${address.postal_code}, ${address.city || 'Unknown'}, ${address.country || 'Belgium'}`);
           await PostalCode.create({
@@ -421,12 +478,29 @@ exports.updatePackage = async (req, res) => {
       ...(description !== undefined && { description }),
       ...(pickupAddressId && { pickup_address_id: pickupAddressId }),
       ...(dropoffAddressId && { dropoff_address_id: dropoffAddressId }),
+      ...(action_type && { action_type }),
+      ...(category && { category }),
+      ...(size && { size }),
       ...(status && { status }),
     };
 
     if (Object.keys(updateData).length === 0) {
       await transaction.rollback();
       return res.status(400).json({ error: 'No valid fields provided to update' });
+    }
+
+    // Validatie van nieuwe velden
+    if (action_type && !['send', 'receive'].includes(action_type)) {
+      await transaction.rollback();
+      return res.status(400).json({ error: 'Invalid action_type, must be "send" or "receive"' });
+    }
+    if (category && !['package', 'food', 'drink'].includes(category)) {
+      await transaction.rollback();
+      return res.status(400).json({ error: 'Invalid category, must be "package", "food", or "drink"' });
+    }
+    if (size && !['small', 'medium', 'large'].includes(size)) {
+      await transaction.rollback();
+      return res.status(400).json({ error: 'Invalid size, must be "small", "medium", or "large"' });
     }
 
     const [updated] = await Package.update(
@@ -678,7 +752,7 @@ exports.searchPackages = async (req, res) => {
 
     const processPostalCode = async (addressData) => {
       if (addressData.postal_code) {
-        const postalCodeExists = await PostalCode.findOne({ where: { code: addressData.postal_code } });
+        const postalCodeExists = await PostalCode.findOne({ where: { code: addressData.postal_code }, transaction });
         if (!postalCodeExists) {
           console.log(`Adding new postal code: ${addressData.postal_code}, ${addressData.city}, ${addressData.country || 'Belgium'}`);
           await PostalCode.create({
