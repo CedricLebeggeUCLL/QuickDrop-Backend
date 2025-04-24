@@ -1,6 +1,5 @@
 const nodemailer = require('nodemailer');
 
-// Configureer de e-mailtransporter (voorbeeld met Gmail)
 const transporter = nodemailer.createTransport({
   service: 'Gmail',
   auth: {
@@ -10,13 +9,20 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendPasswordResetEmail = async (email, resetToken) => {
-  // Gebruik de deep link URL voor de app
   const resetUrl = `quickdrop://resetPassword/${resetToken}`;
   const mailOptions = {
     from: process.env.EMAIL_USER,
     to: email,
     subject: 'Wachtwoordherstel voor QuickDrop',
-    text: `Je hebt een verzoek ingediend om je wachtwoord te herstellen. Klik op de volgende link om je wachtwoord te resetten: ${resetUrl}\n\nAls je dit verzoek niet hebt ingediend, negeer deze e-mail. Deze link verloopt over 1 uur.`,
+    text: `Je hebt een verzoek ingediend om je wachtwoord te herstellen. Kopieer en plak de volgende link om je wachtwoord te resetten: ${resetUrl}\n\nAls je dit verzoek niet hebt ingediend, negeer deze e-mail. Deze link verloopt over 1 uur.`,
+    html: `
+      <p>Je hebt een verzoek ingediend om je wachtwoord te herstellen.</p>
+      <p>Kopieer en plak de onderstaande link om je wachtwoord te resetten:</p>
+      <p><a href="${resetUrl}" style="color: #28a745; text-decoration: underline;">${resetUrl}</a></p>
+      <p>Als de link niet klikbaar is, kopieer en plak deze handmatig in je browser of app.</p>
+      <p>Als je dit verzoek niet hebt ingediend, negeer deze e-mail.</p>
+      <p>Deze link verloopt over 1 uur.</p>
+    `,
   };
 
   try {
