@@ -1,6 +1,6 @@
 const axios = require('axios');
 
-const GOOGLE_API_KEY = 'AIzaSyBwMjsNiecyBf8YyjiuZBN7Dtizdee4nJY'; // Vervang door je eigen API-sleutel
+const GOOGLE_API_KEY = 'AIzaSyBwMjsNiecyBf8YyjiuZBN7Dtizdee4nJY';
 
 const geocodeAddress = async (address) => {
   try {
@@ -16,13 +16,24 @@ const geocodeAddress = async (address) => {
 
     const result = response.data.results[0];
     const addressComponents = result.address_components;
-    const postalCodeComponent = addressComponents.find(component => component.types.includes('postal_code'));
-    const countryMatch = addressComponents.find(component => component.types.includes('country') && component.long_name.toLowerCase() === (address.country || '').toLowerCase());
 
-    const postalCodeMatch = postalCodeComponent && (postalCodeComponent.long_name.includes(address.postal_code) || address.postal_code.includes(postalCodeComponent?.long_name));
+    // Zoek postcode
+    const postalCodeComponent = addressComponents.find(component => component.types.includes('postal_code'));
+    const inputPostalCode = address.postal_code?.trim();
+    const apiPostalCode = postalCodeComponent?.long_name?.trim();
+    const postalCodeMatch = postalCodeComponent && inputPostalCode && apiPostalCode === inputPostalCode;
+
+    // Zoek land en vergelijk landcode (short_name)
+    const countryComponent = addressComponents.find(component => component.types.includes('country'));
+    const inputCountry = address.country?.trim().toLowerCase().replace(/ë/g, 'e'); // Normaliseer 'België' naar 'belgie'
+    const apiCountryCode = countryComponent?.short_name?.toLowerCase(); // Gebruik landcode, zoals 'be'
+    const expectedCountryCode = inputCountry === 'belgie' ? 'be' : inputCountry; // Map 'belgie' naar 'be'
+    const countryMatch = countryComponent && apiCountryCode && apiCountryCode === expectedCountryCode;
 
     if (!postalCodeMatch || !countryMatch) {
-      throw new Error(`Invalid address: ${fullAddress} - Postcode or country mismatch`);
+      throw new Error(
+        `Invalid address: ${fullAddress} - Postcode or country mismatch (Postcode: ${apiPostalCode} vs ${inputPostalCode}, Country code: ${apiCountryCode} vs ${expectedCountryCode})`
+      );
     }
 
     const location = result.geometry.location;
