@@ -9,7 +9,7 @@ const transporter = nodemailer.createTransport({
 });
 
 const sendPasswordResetEmail = async (email, resetToken) => {
-  const resetUrl = `http://192.168.4.64:8000/resetPassword.html?token=${resetToken}`; // Gebruik je lokale IP-adres
+  const resetUrl = `http://192.168.1.18:8000/resetPassword.html?token=${resetToken}`; // Gebruik je lokale IP-adres
   const deepLinkUrl = `quickdrop://resetPassword/${resetToken}`; // Voor de fallback-instructie
   const mailOptions = {
     from: process.env.EMAIL_USER,

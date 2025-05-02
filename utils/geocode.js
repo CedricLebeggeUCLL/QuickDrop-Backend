@@ -2,6 +2,14 @@ const axios = require('axios');
 
 const GOOGLE_API_KEY = 'AIzaSyBwMjsNiecyBf8YyjiuZBN7Dtizdee4nJY';
 
+// Mapping van landnamen en -codes naar de verwachte landcode
+const countryCodeMap = {
+  'belgie': 'be',
+  'belgium': 'be',
+  'be': 'be',
+  'belgiË': 'be', // Voor de zekerheid, hoewel we normaliseren
+};
+
 const geocodeAddress = async (address) => {
   try {
     const fullAddress = `${address.street_name} ${address.house_number}${address.extra_info ? `, ${address.extra_info}` : ''}, ${address.postal_code}, ${address.city || ''}, ${address.country || ''}`;
@@ -27,7 +35,7 @@ const geocodeAddress = async (address) => {
     const countryComponent = addressComponents.find(component => component.types.includes('country'));
     const inputCountry = address.country?.trim().toLowerCase().replace(/ë/g, 'e'); // Normaliseer 'België' naar 'belgie'
     const apiCountryCode = countryComponent?.short_name?.toLowerCase(); // Gebruik landcode, zoals 'be'
-    const expectedCountryCode = inputCountry === 'belgie' ? 'be' : inputCountry; // Map 'belgie' naar 'be'
+    const expectedCountryCode = countryCodeMap[inputCountry] || inputCountry; // Gebruik mapping of fallback naar invoer
     const countryMatch = countryComponent && apiCountryCode && apiCountryCode === expectedCountryCode;
 
     if (!postalCodeMatch || !countryMatch) {
