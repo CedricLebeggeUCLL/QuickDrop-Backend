@@ -1,7 +1,7 @@
-const { sequelize } = require('../db');
-const Address = require('../models/address');
-const PostalCode = require('../models/postalcode');
-const { geocodeAddress } = require('../../utils/geocode'); // Veronderstel dat geocode in utils-map staat
+const { sequelize, models } = require('../db');
+const Address = models.Address;
+const PostalCode = models.PostalCode;
+const { geocodeAddress } = require('../../utils/geocode');
 
 exports.getAddresses = async (req, res) => {
   try {

@@ -1,81 +1,64 @@
 const { DataTypes } = require('sequelize');
-const { sequelize } = require('../db');
-const User = require('./user');
-const Address = require('./address');
 
-const Courier = sequelize.define('Courier', {
-  id: {
-    type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true,
-  },
-  user_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    unique: true,
-    references: {
-      model: User,
-      key: 'id',
+module.exports = (sequelize) => {
+  const Courier = sequelize.define('Courier', {
+    id: {
+      type: DataTypes.INTEGER,
+      primaryKey: true,
+      autoIncrement: true,
     },
-  },
-  current_address_id: {
-    type: DataTypes.INTEGER,
-    references: {
-      model: Address,
-      key: 'id',
+    user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
-    allowNull: true,
-  },
-  start_address_id: {
-    type: DataTypes.INTEGER,
-    references: {
-      model: Address,
-      key: 'id',
+    start_address_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
-    allowNull: true,
-  },
-  destination_address_id: {
-    type: DataTypes.INTEGER,
-    references: {
-      model: Address,
-      key: 'id',
+    destination_address_id: {
+      type: DataTypes.INTEGER,
+      allowNull: true,
     },
-    allowNull: true,
-  },
-  pickup_radius: {
-    type: DataTypes.FLOAT,
-    defaultValue: 5.0,
-  },
-  dropoff_radius: {
-    type: DataTypes.FLOAT,
-    defaultValue: 5.0,
-  },
-  availability: {
-    type: DataTypes.BOOLEAN,
-    defaultValue: true,
-  },
-  itsme_code: {
-    type: DataTypes.STRING(50),
-  },
-  license_number: {
-    type: DataTypes.STRING(50),
-  },
-  current_lat: {
-    type: DataTypes.DECIMAL(10, 7),
-    allowNull: true,
-  },
-  current_lng: {
-    type: DataTypes.DECIMAL(10, 7),
-    allowNull: true,
-  },
-}, {
-  tableName: 'couriers',
-  timestamps: false,
-});
+    pickup_radius: {
+      type: DataTypes.FLOAT,
+      defaultValue: 5.0,
+    },
+    dropoff_radius: {
+      type: DataTypes.FLOAT,
+      defaultValue: 5.0,
+    },
+    availability: {
+      type: DataTypes.BOOLEAN,
+      defaultValue: true,
+    },
+    current_lat: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+    current_lng: {
+      type: DataTypes.DOUBLE,
+      allowNull: true,
+    },
+  }, {
+    tableName: 'couriers',
+    timestamps: false,
+  });
 
-Courier.belongsTo(User, { foreignKey: 'user_id' });
-Courier.belongsTo(Address, { foreignKey: 'current_address_id', as: 'currentAddress' });
-Courier.belongsTo(Address, { foreignKey: 'start_address_id', as: 'startAddress' });
-Courier.belongsTo(Address, { foreignKey: 'destination_address_id', as: 'destinationAddress' });
+  // Definieer associaties
+  Courier.associate = (models) => {
+    // Relatie met Address (startAddress en destinationAddress)
+    Courier.belongsTo(models.Address, { foreignKey: 'start_address_id', as: 'startAddress' });
+    Courier.belongsTo(models.Address, { foreignKey: 'destination_address_id', as: 'destinationAddress' });
 
-module.exports = Courier;
+    // Relatie met User
+    Courier.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
+
+    // Relatie met CourierDetails (1:1)
+    Courier.hasOne(models.CourierDetails, { foreignKey: 'user_id', as: 'details' });
+
+    // Relatie met Delivery
+    Courier.hasMany(models.Delivery, { foreignKey: 'courier_id', as: 'deliveries' });
+  };
+
+  return Courier;
+};

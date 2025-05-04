@@ -10,6 +10,7 @@ USE quickdrop_db;
 -- Drop tables in reverse order of dependencies
 DROP TABLE IF EXISTS deliveries;
 DROP TABLE IF EXISTS packages;
+DROP TABLE IF EXISTS courier_details;
 DROP TABLE IF EXISTS couriers;
 DROP TABLE IF EXISTS addresses;
 DROP TABLE IF EXISTS postal_codes;
@@ -34,7 +35,7 @@ CREATE TABLE addresses (
   FOREIGN KEY (postal_code) REFERENCES postal_codes(code) ON DELETE RESTRICT ON UPDATE CASCADE
 );
 
--- Users table (met refreshTokenExpiry toegevoegd)
+-- Users table
 CREATE TABLE users (
   id INT AUTO_INCREMENT PRIMARY KEY,
   username VARCHAR(50) NOT NULL UNIQUE,
@@ -42,12 +43,42 @@ CREATE TABLE users (
   password VARCHAR(255) NOT NULL,
   role ENUM('user', 'courier', 'admin') DEFAULT 'user',
   refreshToken VARCHAR(255) DEFAULT NULL,
-  refreshTokenExpiry DATETIME DEFAULT NULL, -- Toegevoegd
+  refreshTokenExpiry DATETIME DEFAULT NULL,
   resetToken VARCHAR(255) DEFAULT NULL,
   resetTokenExpiry DATETIME DEFAULT NULL
 );
 
--- Packages table (met nieuwe velden: action_type, category, size)
+-- Courier_details table (for sensitive personal data)
+CREATE TABLE courier_details (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL UNIQUE,
+  first_name VARCHAR(50) NOT NULL,
+  last_name VARCHAR(50) NOT NULL,
+  birth_date DATE NOT NULL,
+  phone_number VARCHAR(20) NOT NULL,
+  encrypted_national_number VARCHAR(255) NOT NULL,
+  nationality VARCHAR(50) NOT NULL,
+  itsme_verified BOOLEAN DEFAULT FALSE,
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Couriers table
+CREATE TABLE couriers (
+  id INT AUTO_INCREMENT PRIMARY KEY,
+  user_id INT NOT NULL UNIQUE,
+  start_address_id INT,
+  destination_address_id INT,
+  pickup_radius FLOAT DEFAULT 5.0,
+  dropoff_radius FLOAT DEFAULT 5.0,
+  availability BOOLEAN DEFAULT TRUE,
+  current_lat DECIMAL(10, 7),
+  current_lng DECIMAL(10, 7),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (start_address_id) REFERENCES addresses(id) ON DELETE SET NULL,
+  FOREIGN KEY (destination_address_id) REFERENCES addresses(id) ON DELETE SET NULL
+);
+
+-- Packages table
 CREATE TABLE packages (
   id INT AUTO_INCREMENT PRIMARY KEY,
   user_id INT NOT NULL,
@@ -62,26 +93,6 @@ CREATE TABLE packages (
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
   FOREIGN KEY (pickup_address_id) REFERENCES addresses(id) ON DELETE RESTRICT,
   FOREIGN KEY (dropoff_address_id) REFERENCES addresses(id) ON DELETE RESTRICT
-);
-
--- Couriers table with current_lat and current_lng for live tracking
-CREATE TABLE couriers (
-  id INT AUTO_INCREMENT PRIMARY KEY,
-  user_id INT NOT NULL UNIQUE,
-  current_address_id INT,
-  start_address_id INT,
-  destination_address_id INT,
-  pickup_radius FLOAT DEFAULT 5.0,
-  dropoff_radius FLOAT DEFAULT 5.0,
-  availability BOOLEAN DEFAULT TRUE,
-  itsme_code VARCHAR(50),
-  license_number VARCHAR(50),
-  current_lat DECIMAL(10, 7),
-  current_lng DECIMAL(10, 7),
-  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (current_address_id) REFERENCES addresses(id) ON DELETE SET NULL,
-  FOREIGN KEY (start_address_id) REFERENCES addresses(id) ON DELETE RESTRICT,
-  FOREIGN KEY (destination_address_id) REFERENCES addresses(id) ON DELETE RESTRICT
 );
 
 -- Deliveries table
@@ -126,7 +137,27 @@ INSERT INTO users (username, email, password, role, refreshToken, refreshTokenEx
 ('adminuser', 'admin@quickdrop.com', '$2b$10$rXlsB9m8zl.yYcgujJg48OZMm.kVdZItHiPxyjB.PElMDo1mCVB0m', 'admin', NULL, NULL),
 ('cedric', 'cedric@example.com', '$2b$10$P2PcEmK.HXjnYnIso5qBt.zHfNruztJUY/OWh6XhuAdwgN9Gq9DFu', 'user', NULL, NULL);
 
--- Insert sample packages (met nieuwe velden)
+-- Insert sample courier_details
+INSERT INTO courier_details (user_id, first_name, last_name, birth_date, phone_number, encrypted_national_number, nationality, itsme_verified)
+SELECT id, 'Bob', 'Smith', '1985-05-15', '+32123456789', 'encrypted_national_number', 'België', TRUE
+FROM users WHERE username = 'bobsmith';
+
+-- Insert sample couriers
+INSERT INTO couriers (user_id, start_address_id, destination_address_id, pickup_radius, dropoff_radius, availability, current_lat, current_lng)
+SELECT u.id, a1.id, a2.id, 10.0, 15.0, TRUE, NULL, NULL
+FROM users u
+JOIN addresses a1 ON a1.street_name = 'Rue de la Loi' AND a1.house_number = '100'
+JOIN addresses a2 ON a2.street_name = 'Meir' AND a2.house_number = '50'
+WHERE u.username = 'bobsmith';
+
+INSERT INTO couriers (user_id, start_address_id, destination_address_id, pickup_radius, dropoff_radius, availability, current_lat, current_lng)
+SELECT u.id, a1.id, a2.id, 5.0, 5.0, TRUE, NULL, NULL
+FROM users u
+JOIN addresses a1 ON a1.street_name = 'Meir' AND a1.house_number = '50'
+JOIN addresses a2 ON a2.street_name = 'Rue de la Loi' AND a2.house_number = '100'
+WHERE u.username = 'adminuser';
+
+-- Insert sample packages
 SET @pickup_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Rue de la Loi' AND house_number = '100');
 SET @dropoff_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Meir' AND house_number = '50');
 SET @pickup_addr_id2 = (SELECT id FROM addresses WHERE street_name = 'Beemdstraat' AND house_number = '8');
@@ -141,23 +172,7 @@ INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_i
 (4, 'Speelgoed - Ontvanger: Piet, Gewicht: 1 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'small', 'pending'),
 (5, 'TV - Ontvanger: Cedric Lebegge, Gewicht: 1 kg', @pickup_addr_id3, @dropoff_addr_id3, 'send', 'package', 'large', 'pending');
 
--- Get user IDs for couriers
-SET @bobsmith_id = (SELECT id FROM users WHERE username = 'bobsmith');
-SET @adminuser_id = (SELECT id FROM users WHERE username = 'adminuser');
-
--- Get address IDs for couriers
-SET @current_addr_id = (SELECT id FROM addresses WHERE street_name = 'Boulevard Anspach' AND house_number = '20');
-SET @start_addr_id = (SELECT id FROM addresses WHERE street_name = 'Rue de la Loi' AND house_number = '100');
-SET @dest_addr_id = (SELECT id FROM addresses WHERE street_name = 'Meir' AND house_number = '50');
-
--- Insert sample couriers
-INSERT INTO couriers (user_id, current_address_id, start_address_id, destination_address_id, pickup_radius, dropoff_radius, availability, itsme_code, license_number, current_lat, current_lng) VALUES
-(@bobsmith_id, @current_addr_id, @start_addr_id, @dest_addr_id, 10.0, 15.0, TRUE, 'ITSME123', 'ABC123456', NULL, NULL),
-(@adminuser_id, @dest_addr_id, @dest_addr_id, @start_addr_id, 5.0, 5.0, TRUE, 'ITSME456', NULL, NULL, NULL);
-
--- Get courier IDs for deliveries
-SET @bobsmith_courier_id = (SELECT id FROM couriers WHERE user_id = @bobsmith_id);
-
 -- Insert sample deliveries
+SET @bobsmith_courier_id = (SELECT id FROM couriers WHERE user_id = (SELECT id FROM users WHERE username = 'bobsmith'));
 INSERT INTO deliveries (package_id, courier_id, pickup_address_id, dropoff_address_id, pickup_time, status) VALUES
 (2, @bobsmith_courier_id, @dropoff_addr_id1, @pickup_addr_id1, '2025-01-10 12:00:00', 'picked_up');

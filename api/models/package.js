@@ -1,68 +1,59 @@
-const { Sequelize, DataTypes } = require('sequelize');
-const { sequelize } = require('../db');
-const User = require('./user');
-const Address = require('./address');
+const { DataTypes, Sequelize } = require('sequelize');
 
-const Package = sequelize.define('Package', {
-  id: {
-    type: DataTypes.INTEGER,
-    autoIncrement: true,
-    primaryKey: true,
-  },
-  user_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: User,
-      key: 'id',
+module.exports = (sequelize) => {
+  const Package = sequelize.define('Package', {
+    id: {
+      type: DataTypes.INTEGER,
+      autoIncrement: true,
+      primaryKey: true,
     },
-  },
-  description: {
-    type: DataTypes.TEXT,
-  },
-  pickup_address_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: Address,
-      key: 'id',
+    user_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
     },
-  },
-  dropoff_address_id: {
-    type: DataTypes.INTEGER,
-    allowNull: false,
-    references: {
-      model: Address,
-      key: 'id',
+    description: {
+      type: DataTypes.TEXT,
     },
-  },
-  action_type: {
-    type: DataTypes.ENUM('send', 'receive'),
-    allowNull: false,
-  },
-  category: {
-    type: DataTypes.ENUM('package', 'food', 'drink'),
-    defaultValue: 'package',
-  },
-  size: {
-    type: DataTypes.ENUM('small', 'medium', 'large'),
-    defaultValue: 'medium',
-  },
-  status: {
-    type: DataTypes.ENUM('pending', 'assigned', 'in_transit', 'delivered'),
-    defaultValue: 'pending',
-  },
-  created_at: {
-    type: DataTypes.DATE,
-    defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
-  },
-}, {
-  tableName: 'packages',
-  timestamps: false,
-});
+    pickup_address_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    dropoff_address_id: {
+      type: DataTypes.INTEGER,
+      allowNull: false,
+    },
+    action_type: {
+      type: DataTypes.ENUM('send', 'receive'),
+      allowNull: false,
+    },
+    category: {
+      type: DataTypes.ENUM('package', 'food', 'drink'),
+      defaultValue: 'package',
+    },
+    size: {
+      type: DataTypes.ENUM('small', 'medium', 'large'),
+      defaultValue: 'medium',
+    },
+    status: {
+      type: DataTypes.ENUM('pending', 'assigned', 'in_transit', 'delivered'),
+      defaultValue: 'pending',
+    },
+    created_at: {
+      type: DataTypes.DATE,
+      defaultValue: Sequelize.literal('CURRENT_TIMESTAMP'),
+    },
+  }, {
+    tableName: 'packages',
+    timestamps: false,
+  });
 
-Package.belongsTo(User, { foreignKey: 'user_id' });
-Package.belongsTo(Address, { foreignKey: 'pickup_address_id', as: 'pickupAddress' });
-Package.belongsTo(Address, { foreignKey: 'dropoff_address_id', as: 'dropoffAddress' });
+  // Definieer associaties
+  Package.associate = (models) => {
+    Package.belongsTo(models.User, { foreignKey: 'user_id', as: 'user' });
+    Package.belongsTo(models.Address, { foreignKey: 'pickup_address_id', as: 'pickupAddress' });
+    Package.belongsTo(models.Address, { foreignKey: 'dropoff_address_id', as: 'dropoffAddress' });
+    Package.hasOne(models.Delivery, { foreignKey: 'package_id', as: 'delivery' });
+  };
 
-module.exports = Package;
+  return Package;
+};

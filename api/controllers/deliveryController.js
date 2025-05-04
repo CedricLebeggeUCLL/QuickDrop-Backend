@@ -1,9 +1,9 @@
-const { sequelize } = require('../db');
-const Delivery = require('../models/delivery');
-const Package = require('../models/package');
-const Courier = require('../models/courier');
-const Address = require('../models/address');
-const PostalCode = require('../models/postalcode');
+const { sequelize, models } = require('../db');
+const Delivery = models.Delivery;
+const Package = models.Package;
+const Courier = models.Courier;
+const Address = models.Address;
+const PostalCode = models.PostalCode;
 const { haversineDistance } = require('../../utils/distance');
 const { geocodeAddress } = require('../../utils/geocode');
 

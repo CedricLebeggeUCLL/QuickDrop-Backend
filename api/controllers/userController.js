@@ -1,7 +1,7 @@
-const { sequelize } = require('../db');
+const { sequelize, models } = require('../db');
 const { Sequelize } = require('sequelize');
 const Op = Sequelize.Op;
-const User = require('../models/user');
+const User = models.User;
 const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const crypto = require('crypto');

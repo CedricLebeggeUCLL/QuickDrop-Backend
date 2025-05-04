@@ -4,7 +4,26 @@ require('dotenv').config({ path: '../.env' }); // Specificeer pad naar .env in r
 const sequelize = new Sequelize(process.env.DB_NAME, process.env.DB_USER, process.env.DB_PASSWORD, {
   host: process.env.DB_HOST,
   dialect: 'mysql',
-  logging: false // Gebruik console.log voor logging, or set to false
+  logging: false // Gebruik console.log voor logging, of set to false
+});
+
+// Laad alle modellen
+const models = {
+  User: require('./models/user')(sequelize),
+  Address: require('./models/address')(sequelize),
+  Courier: require('./models/courier')(sequelize),
+  CourierDetails: require('./models/courierDetails')(sequelize),
+  Package: require('./models/package')(sequelize),
+  Delivery: require('./models/delivery')(sequelize),
+  PostalCode: require('./models/postalcode')(sequelize),
+  // Voeg andere modellen toe als je die hebt
+};
+
+// Stel associaties in
+Object.keys(models).forEach((modelName) => {
+  if (models[modelName].associate) {
+    models[modelName].associate(models);
+  }
 });
 
 // Test de verbinding
@@ -31,8 +50,9 @@ async function syncModels() {
 testConnection();
 syncModels();
 
-// Exporteer de Sequelize instance
+// Exporteer de Sequelize instance en modellen
 module.exports = {
   sequelize,
-  testConnection
+  testConnection,
+  models,
 };

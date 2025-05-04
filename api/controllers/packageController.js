@@ -1,13 +1,13 @@
-const { sequelize } = require('../db');
+const { sequelize, models } = require('../db');
 const { Op } = require('sequelize');
 const { haversineDistance } = require('../../utils/distance');
 const { geocodeAddress } = require('../../utils/geocode');
-const Package = require('../models/package');
-const Courier = require('../models/courier');
-const Address = require('../models/address');
-const PostalCode = require('../models/postalcode');
-const User = require('../models/user');
-const Delivery = require('../models/delivery');
+const Delivery = models.Delivery;
+const Package = models.Package;
+const Courier = models.Courier;
+const Address = models.Address;
+const PostalCode = models.PostalCode;
+const User = models.User;
 
 exports.getPackages = async (req, res) => {
   try {

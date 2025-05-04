@@ -2,14 +2,13 @@ const express = require('express');
 const router = express.Router();
 const courierController = require('../controllers/courierController');
 
-router.get('/', courierController.getCouriers); // Alle couriers ophalen
-router.get('/:id', courierController.getCourierById); // Een specifieke courier ophalen
-router.get('/user/:userId', courierController.getCourierByUserId); // Courier ophalen op basis van userId
-router.post('/become', courierController.becomeCourier); // Nieuwe courier aanmaken
-router.put('/:id', courierController.updateCourier); // Courier bijwerken
-router.delete('/:id', courierController.deleteCourier); // Courier verwijderen
-
-// Nieuwe route voor het updaten van de locatie van de courier
-router.post('/:id/location', courierController.updateCourierLocation);
+router.get('/', courierController.getCouriers);
+router.get('/:id', courierController.getCourierById);
+router.get('/user/:userId', courierController.getCourierByUserId);
+router.post('/become', courierController.becomeCourier);
+router.post('/itsme-callback', courierController.handleItsmeCallback);
+router.put('/:id', courierController.updateCourier);
+router.delete('/:id', courierController.deleteCourier);
+router.put('/:id/location', courierController.updateCourierLocation);
 
 module.exports = router;
