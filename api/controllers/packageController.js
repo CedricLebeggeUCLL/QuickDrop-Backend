@@ -43,7 +43,7 @@ exports.getPackages = async (req, res) => {
 
         console.log(`Found ${packages.length} packages`);
 
-        // Transformeer de data om city en country toe te voegen
+        // Transform data to include city and country
         const transformedPackages = packages.map(pkg => {
             const pkgJson = pkg.toJSON();
             return {
@@ -61,7 +61,7 @@ exports.getPackages = async (req, res) => {
             };
         });
 
-        // Verwijder postalCodeDetails uit de response
+        // Remove postalCodeDetails from response
         transformedPackages.forEach(pkg => {
             if (pkg.pickupAddress) delete pkg.pickupAddress.postalCodeDetails;
             if (pkg.dropoffAddress) delete pkg.dropoffAddress.postalCodeDetails;
@@ -175,7 +175,7 @@ exports.getPackagesByUserId = async (req, res) => {
 
         console.log(`Found ${packages.length} packages for user_id: ${userId}`);
 
-        // Transformeer de data om city en country toe te voegen
+        // Transform data to include city and country
         const transformedPackages = packages.map(pkg => {
             const pkgJson = pkg.toJSON();
             return {
@@ -193,7 +193,7 @@ exports.getPackagesByUserId = async (req, res) => {
             };
         });
 
-        // Verwijder postalCodeDetails uit de response
+        // Remove postalCodeDetails from response
         transformedPackages.forEach(pkg => {
             if (pkg.pickupAddress) delete pkg.pickupAddress.postalCodeDetails;
             if (pkg.dropoffAddress) delete pkg.dropoffAddress.postalCodeDetails;
@@ -209,11 +209,11 @@ exports.getPackagesByUserId = async (req, res) => {
 exports.addPackage = async (req, res) => {
     console.log('Entering addPackage endpoint');
     const userId = req.body.user_id;
-    const { description, pickup_address, dropoff_address, action_type, category, size } = req.body;
+    const { description, pickup_address, dropoff_address, action_type, size } = req.body;
 
     console.log('Create package request received:', JSON.stringify(req.body, null, 2));
 
-    // Validatie van verplichte velden
+    // Validate required fields
     if (!pickup_address || !dropoff_address) {
         console.log('Missing pickup or dropoff address');
         return res.status(400).json({ error: 'Pickup and dropoff addresses are required' });
@@ -225,10 +225,6 @@ exports.addPackage = async (req, res) => {
     if (!action_type || !['send', 'receive'].includes(action_type)) {
         console.log('Invalid action_type:', action_type);
         return res.status(400).json({ error: 'Invalid action_type, must be "send" or "receive"' });
-    }
-    if (!category || !['package', 'food', 'drink'].includes(category)) {
-        console.log('Invalid category:', category);
-        return res.status(400).json({ error: 'Invalid category, must be "package", "food", or "drink"' });
     }
     if (!size || !['small', 'medium', 'large'].includes(size)) {
         console.log('Invalid size:', size);
@@ -324,7 +320,7 @@ exports.addPackage = async (req, res) => {
             pickup_address_id: pickupAddress.id,
             dropoff_address_id: dropoffAddress.id,
             action_type,
-            category,
+            category: 'package', // Hardcoded to 'package'
             size,
             status: 'pending',
         }, { transaction });
@@ -333,7 +329,7 @@ exports.addPackage = async (req, res) => {
         await transaction.commit();
         console.log('Transaction committed');
 
-        // Haal het aangemaakte pakket op met alle relaties voor de response
+        // Fetch the created package with all relations for the response
         const createdPackage = await Package.findByPk(packageItem.id, {
             include: [
                 {
@@ -393,7 +389,7 @@ exports.addPackage = async (req, res) => {
 };
 
 exports.updatePackage = async (req, res) => {
-    const { description, pickup_address, dropoff_address, action_type, category, size, status } = req.body;
+    const { description, pickup_address, dropoff_address, action_type, size, status } = req.body;
     const transaction = await sequelize.transaction();
     try {
         let pickupAddressId, dropoffAddressId;
@@ -505,7 +501,6 @@ exports.updatePackage = async (req, res) => {
             ...(pickupAddressId && { pickup_address_id: pickupAddressId }),
             ...(dropoffAddressId && { dropoff_address_id: dropoffAddressId }),
             ...(action_type && { action_type }),
-            ...(category && { category }),
             ...(size && { size }),
             ...(status && { status }),
         };
@@ -516,16 +511,11 @@ exports.updatePackage = async (req, res) => {
             return res.status(400).json({ error: 'No valid fields provided to update' });
         }
 
-        // Validatie van nieuwe velden
+        // Validate new fields
         if (action_type && !['send', 'receive'].includes(action_type)) {
             console.log('Invalid action_type:', action_type);
             await transaction.rollback();
             return res.status(400).json({ error: 'Invalid action_type, must be "send" or "receive"' });
-        }
-        if (category && !['package', 'food', 'drink'].includes(category)) {
-            console.log('Invalid category:', category);
-            await transaction.rollback();
-            return res.status(400).json({ error: 'Invalid category, must be "package", "food", or "drink"' });
         }
         if (size && !['small', 'medium', 'large'].includes(size)) {
             console.log('Invalid size:', size);
@@ -692,7 +682,7 @@ exports.trackPackage = async (req, res) => {
             currentLocation,
             pickupAddress: packageItem.pickupAddress ? { ...packageItem.pickupAddress.toJSON() } : null,
             dropoffAddress: packageItem.dropoffAddress ? { ...packageItem.dropoffAddress.toJSON() } : null,
-            estimatedDelivery: 'Niet beschikbaar',
+            estimatedDelivery: 'Not available',
         };
 
         res.json(trackingInfo);
@@ -708,7 +698,7 @@ exports.searchPackages = async (req, res) => {
 
     console.log('Request body received:', JSON.stringify(req.body, null, 2));
 
-    // Validatie van verplichte velden
+    // Validate required fields
     if (!pickup_radius || !dropoff_radius) {
         console.log('Missing pickup_radius or dropoff_radius');
         return res.status(400).json({ error: 'Pickup radius and dropoff radius are required' });
@@ -854,7 +844,7 @@ exports.searchPackages = async (req, res) => {
         }, { transaction });
         console.log('Courier updated:', courier.toJSON());
 
-        // Haal pakketten op, maar sluit pakketten uit die door de koerier zelf zijn aangemaakt
+        // Fetch packages, excluding those created by the courier
         console.log('Fetching pending packages excluding user_id:', userId);
         const packages = await Package.findAll({
             where: {
@@ -919,7 +909,7 @@ exports.searchPackages = async (req, res) => {
 
         console.log(`Found ${matchingPackages.length} matching packages`);
 
-        // Transformeer de data om city en country toe te voegen
+        // Transform data to include city and country
         const transformedPackages = matchingPackages.map(pkg => {
             const pkgJson = pkg.toJSON();
             return {
@@ -937,7 +927,7 @@ exports.searchPackages = async (req, res) => {
             };
         });
 
-        // Verwijder postalCodeDetails uit de response
+        // Remove postalCodeDetails from response
         transformedPackages.forEach(pkg => {
             if (pkg.pickupAddress) delete pkg.pickupAddress.postalCodeDetails;
             if (pkg.dropoffAddress) delete pkg.dropoffAddress.postalCodeDetails;

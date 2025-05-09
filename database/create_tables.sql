@@ -86,7 +86,7 @@ CREATE TABLE packages (
   pickup_address_id INT NOT NULL,
   dropoff_address_id INT NOT NULL,
   action_type ENUM('send', 'receive') NOT NULL,
-  category ENUM('package', 'food', 'drink') DEFAULT 'package',
+  category ENUM('package') DEFAULT 'package',
   size ENUM('small', 'medium', 'large') DEFAULT 'medium',
   status ENUM('pending', 'assigned', 'in_transit', 'delivered') DEFAULT 'pending',
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
@@ -139,7 +139,7 @@ INSERT INTO users (username, email, password, role, refreshToken, refreshTokenEx
 
 -- Insert sample courier_details
 INSERT INTO courier_details (user_id, first_name, last_name, birth_date, phone_number, encrypted_national_number, nationality, itsme_verified)
-SELECT id, 'Bob', 'Smith', '1985-05-15', '+32123456789', 'encrypted_national_number', 'België', TRUE
+SELECT id, 'Bob', 'Smith', '1985-05-15', '+32123456789', 'encrypted_national_number', 'Belgium', TRUE
 FROM users WHERE username = 'bobsmith';
 
 -- Insert sample couriers
@@ -166,11 +166,11 @@ SET @pickup_addr_id3 = (SELECT id FROM addresses WHERE street_name = 'Sliksteenv
 SET @dropoff_addr_id3 = (SELECT id FROM addresses WHERE street_name = 'Beemdstraat' AND house_number = '30');
 
 INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, action_type, category, size, status) VALUES
-(1, 'Gift for friend - Ontvanger: Jane Doe', @pickup_addr_id1, @dropoff_addr_id1, 'send', 'package', 'medium', 'pending'),
-(2, 'Study books - Ontvanger: John Smith', @dropoff_addr_id1, @pickup_addr_id1, 'send', 'package', 'medium', 'assigned'),
-(3, 'Boeken - Ontvanger: Cedric Lebegge, Gewicht: 5 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'medium', 'pending'),
-(4, 'Speelgoed - Ontvanger: Piet, Gewicht: 1 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'small', 'pending'),
-(5, 'TV - Ontvanger: Cedric Lebegge, Gewicht: 1 kg', @pickup_addr_id3, @dropoff_addr_id3, 'send', 'package', 'large', 'pending');
+(1, 'Gift for friend - Jane Doe, Weight: 2 kg', @pickup_addr_id1, @dropoff_addr_id1, 'send', 'package', 'medium', 'pending'),
+(2, 'Study books - John Smith, Weight: 3 kg', @dropoff_addr_id1, @pickup_addr_id1, 'send', 'package', 'medium', 'assigned'),
+(3, 'Books - Cedric Lebegge, Weight: 5 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'medium', 'pending'),
+(4, 'Toys - Piet, Weight: 1 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'small', 'pending'),
+(5, 'TV - Cedric Lebegge, Weight: 10 kg', @pickup_addr_id3, @dropoff_addr_id3, 'send', 'package', 'large', 'pending');
 
 -- Insert sample deliveries
 SET @bobsmith_courier_id = (SELECT id FROM couriers WHERE user_id = (SELECT id FROM users WHERE username = 'bobsmith'));
