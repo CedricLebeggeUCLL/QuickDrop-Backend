@@ -157,7 +157,7 @@ JOIN addresses a1 ON a1.street_name = 'Meir' AND a1.house_number = '50'
 JOIN addresses a2 ON a2.street_name = 'Rue de la Loi' AND a2.house_number = '100'
 WHERE u.username = 'adminuser';
 
--- Insert sample packages
+-- Insert sample packages (original)
 SET @pickup_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Rue de la Loi' AND house_number = '100');
 SET @dropoff_addr_id1 = (SELECT id FROM addresses WHERE street_name = 'Meir' AND house_number = '50');
 SET @pickup_addr_id2 = (SELECT id FROM addresses WHERE street_name = 'Beemdstraat' AND house_number = '8');
@@ -165,14 +165,98 @@ SET @dropoff_addr_id2 = (SELECT id FROM addresses WHERE street_name = 'Sliksteen
 SET @pickup_addr_id3 = (SELECT id FROM addresses WHERE street_name = 'Sliksteenvest' AND house_number = '5');
 SET @dropoff_addr_id3 = (SELECT id FROM addresses WHERE street_name = 'Beemdstraat' AND house_number = '30');
 
-INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, action_type, category, size, status) VALUES
-(1, 'Gift for friend - Jane Doe, Weight: 2 kg', @pickup_addr_id1, @dropoff_addr_id1, 'send', 'package', 'medium', 'pending'),
-(2, 'Study books - John Smith, Weight: 3 kg', @dropoff_addr_id1, @pickup_addr_id1, 'send', 'package', 'medium', 'assigned'),
-(3, 'Books - Cedric Lebegge, Weight: 5 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'medium', 'pending'),
-(4, 'Toys - Piet, Weight: 1 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'small', 'pending'),
-(5, 'TV - Cedric Lebegge, Weight: 10 kg', @pickup_addr_id3, @dropoff_addr_id3, 'send', 'package', 'large', 'pending');
+INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, action_type, category, size, status, created_at) VALUES
+(1, 'Gift for friend - Jane Doe, Weight: 2 kg', @pickup_addr_id1, @dropoff_addr_id1, 'send', 'package', 'medium', 'pending', CURRENT_TIMESTAMP),
+(2, 'Study books - John Smith, Weight: 3 kg', @dropoff_addr_id1, @pickup_addr_id1, 'send', 'package', 'medium', 'assigned', CURRENT_TIMESTAMP),
+(3, 'Books - Cedric Lebegge, Weight: 5 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'medium', 'pending', CURRENT_TIMESTAMP),
+(4, 'Toys - Piet, Weight: 1 kg', @pickup_addr_id2, @dropoff_addr_id2, 'send', 'package', 'small', 'pending', CURRENT_TIMESTAMP),
+(5, 'TV - Cedric Lebegge, Weight: 10 kg', @pickup_addr_id3, @dropoff_addr_id3, 'send', 'package', 'large', 'pending', CURRENT_TIMESTAMP);
 
--- Insert sample deliveries
+-- Insert additional delivered packages for janedoe and bobsmith
+-- January 2025: 3 packages (2 for janedoe, 1 for bobsmith)
+INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, action_type, category, size, status, created_at) VALUES
+(2, 'Clothes - Jane Doe, Weight: 1 kg', @pickup_addr_id1, @dropoff_addr_id2, 'send', 'package', 'small', 'delivered', '2025-01-05 10:00:00'),
+(2, 'Electronics - Jane Doe, Weight: 4 kg', @pickup_addr_id2, @dropoff_addr_id1, 'send', 'package', 'medium', 'delivered', '2025-01-15 14:30:00'),
+(3, 'Documents - Bob Smith, Weight: 0.5 kg', @pickup_addr_id3, @dropoff_addr_id2, 'send', 'package', 'small', 'delivered', '2025-01-20 09:00:00');
+
+-- February 2025: 6 packages (3 for janedoe, 3 for bobsmith)
+INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, action_type, category, size, status, created_at) VALUES
+(2, 'Books - Jane Doe, Weight: 3 kg', @pickup_addr_id1, @dropoff_addr_id3, 'send', 'package', 'medium', 'delivered', '2025-02-03 11:00:00'),
+(2, 'Gift box - Jane Doe, Weight: 2 kg', @pickup_addr_id2, @dropoff_addr_id1, 'send', 'package', 'medium', 'delivered', '2025-02-10 13:00:00'),
+(2, 'Shoes - Jane Doe, Weight: 1.5 kg', @pickup_addr_id3, @dropoff_addr_id2, 'send', 'package', 'small', 'delivered', '2025-02-20 15:00:00'),
+(3, 'Tools - Bob Smith, Weight: 5 kg', @pickup_addr_id1, @dropoff_addr_id2, 'send', 'package', 'large', 'delivered', '2025-02-05 08:30:00'),
+(3, 'Clothing - Bob Smith, Weight: 2 kg', @pickup_addr_id2, @dropoff_addr_id3, 'send', 'package', 'medium', 'delivered', '2025-02-12 10:00:00'),
+(3, 'Accessories - Bob Smith, Weight: 1 kg', @pickup_addr_id3, @dropoff_addr_id1, 'send', 'package', 'small', 'delivered', '2025-02-25 14:00:00');
+
+-- March 2025: 4 packages (2 for janedoe, 2 for bobsmith)
+INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, action_type, category, size, status, created_at) VALUES
+(2, 'Furniture - Jane Doe, Weight: 10 kg', @pickup_addr_id1, @dropoff_addr_id2, 'send', 'package', 'large', 'delivered', '2025-03-07 09:00:00'),
+(2, 'Toys - Jane Doe, Weight: 1 kg', @pickup_addr_id2, @dropoff_addr_id3, 'send', 'package', 'small', 'delivered', '2025-03-15 12:00:00'),
+(3, 'Books - Bob Smith, Weight: 4 kg', @pickup_addr_id3, @dropoff_addr_id1, 'send', 'package', 'medium', 'delivered', '2025-03-10 10:00:00'),
+(3, 'Electronics - Bob Smith, Weight: 3 kg', @pickup_addr_id1, @dropoff_addr_id2, 'send', 'package', 'medium', 'delivered', '2025-03-20 11:00:00');
+
+-- April 2025: 5 packages (3 for janedoe, 2 for bobsmith) - Corrected user_id 15 to 2
+INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, action_type, category, size, status, created_at) VALUES
+(2, 'Kitchenware - Jane Doe, Weight: 6 kg', @pickup_addr_id2, @dropoff_addr_id1, 'send', 'package', 'large', 'delivered', '2025-04-05 14:00:00'),
+(2, 'Clothes - Jane Doe, Weight: 2 kg', @pickup_addr_id3, @dropoff_addr_id2, 'send', 'package', 'medium', 'delivered', '2025-04-12 09:30:00'),
+(2, 'Documents - Jane Doe, Weight: 0.5 kg', @pickup_addr_id1, @dropoff_addr_id3, 'send', 'package', 'small', 'delivered', '2025-04-20 11:00:00'),
+(3, 'Gadgets - Bob Smith, Weight: 3 kg', @pickup_addr_id2, @dropoff_addr_id1, 'send', 'package', 'medium', 'delivered', '2025-04-08 10:00:00'),
+(3, 'Books - Bob Smith, Weight: 2 kg', @pickup_addr_id3, @dropoff_addr_id2, 'send', 'package', 'medium', 'delivered', '2025-04-15 13:00:00');
+
+-- May 2025: 2 packages (1 for janedoe, 1 for bobsmith)
+INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, action_type, category, size, status, created_at) VALUES
+(2, 'Jewelry - Jane Doe, Weight: 0.2 kg', @pickup_addr_id1, @dropoff_addr_id2, 'send', 'package', 'small', 'delivered', '2025-05-10 12:00:00'),
+(3, 'Tools - Bob Smith, Weight: 5 kg', @pickup_addr_id2, @dropoff_addr_id3, 'send', 'package', 'large', 'delivered', '2025-05-15 09:00:00');
+
+-- June 2025: 3 packages (2 for janedoe, 1 for bobsmith)
+INSERT INTO packages (user_id, description, pickup_address_id, dropoff_address_id, action_type, category, size, status, created_at) VALUES
+(2, 'Books - Jane Doe, Weight: 3 kg', @pickup_addr_id3, @dropoff_addr_id1, 'send', 'package', 'medium', 'delivered', '2025-06-05 10:00:00'),
+(2, 'Clothes - Jane Doe, Weight: 1.5 kg', @pickup_addr_id1, @dropoff_addr_id2, 'send', 'package', 'small', 'delivered', '2025-06-10 14:00:00'),
+(3, 'Electronics - Bob Smith, Weight: 2 kg', @pickup_addr_id2, @dropoff_addr_id3, 'send', 'package', 'medium', 'delivered', '2025-06-07 11:00:00');
+
+-- Insert sample deliveries (original)
 SET @bobsmith_courier_id = (SELECT id FROM couriers WHERE user_id = (SELECT id FROM users WHERE username = 'bobsmith'));
 INSERT INTO deliveries (package_id, courier_id, pickup_address_id, dropoff_address_id, pickup_time, status) VALUES
 (2, @bobsmith_courier_id, @dropoff_addr_id1, @pickup_addr_id1, '2025-01-10 12:00:00', 'picked_up');
+
+-- Insert additional delivered deliveries for bobsmith
+-- January 2025: 3 deliveries
+INSERT INTO deliveries (package_id, courier_id, pickup_address_id, dropoff_address_id, pickup_time, delivery_time, status) VALUES
+(6, @bobsmith_courier_id, @pickup_addr_id1, @dropoff_addr_id2, '2025-01-05 10:30:00', '2025-01-05 12:00:00', 'delivered'),
+(7, @bobsmith_courier_id, @pickup_addr_id2, @dropoff_addr_id1, '2025-01-15 15:00:00', '2025-01-15 16:30:00', 'delivered'),
+(8, @bobsmith_courier_id, @pickup_addr_id3, @dropoff_addr_id2, '2025-01-20 09:30:00', '2025-01-20 11:00:00', 'delivered');
+
+-- February 2025: 6 deliveries
+INSERT INTO deliveries (package_id, courier_id, pickup_address_id, dropoff_address_id, pickup_time, delivery_time, status) VALUES
+(9, @bobsmith_courier_id, @pickup_addr_id1, @dropoff_addr_id3, '2025-02-03 11:30:00', '2025-02-03 13:00:00', 'delivered'),
+(10, @bobsmith_courier_id, @pickup_addr_id2, @dropoff_addr_id1, '2025-02-10 13:30:00', '2025-02-10 15:00:00', 'delivered'),
+(11, @bobsmith_courier_id, @pickup_addr_id3, @dropoff_addr_id2, '2025-02-20 15:30:00', '2025-02-20 17:00:00', 'delivered'),
+(12, @bobsmith_courier_id, @pickup_addr_id1, @dropoff_addr_id2, '2025-02-05 09:00:00', '2025-02-05 10:30:00', 'delivered'),
+(13, @bobsmith_courier_id, @pickup_addr_id2, @dropoff_addr_id3, '2025-02-12 10:30:00', '2025-02-12 12:00:00', 'delivered'),
+(14, @bobsmith_courier_id, @pickup_addr_id3, @dropoff_addr_id1, '2025-02-25 14:30:00', '2025-02-25 16:00:00', 'delivered');
+
+-- March 2025: 4 deliveries
+INSERT INTO deliveries (package_id, courier_id, pickup_address_id, dropoff_address_id, pickup_time, delivery_time, status) VALUES
+(15, @bobsmith_courier_id, @pickup_addr_id1, @dropoff_addr_id2, '2025-03-07 09:30:00', '2025-03-07 11:00:00', 'delivered'),
+(16, @bobsmith_courier_id, @pickup_addr_id2, @dropoff_addr_id3, '2025-03-15 12:30:00', '2025-03-15 14:00:00', 'delivered'),
+(17, @bobsmith_courier_id, @pickup_addr_id3, @dropoff_addr_id1, '2025-03-10 10:30:00', '2025-03-10 12:00:00', 'delivered'),
+(18, @bobsmith_courier_id, @pickup_addr_id1, @dropoff_addr_id2, '2025-03-20 11:30:00', '2025-03-20 13:00:00', 'delivered');
+
+-- April 2025: 5 deliveries
+INSERT INTO deliveries (package_id, courier_id, pickup_address_id, dropoff_address_id, pickup_time, delivery_time, status) VALUES
+(19, @bobsmith_courier_id, @pickup_addr_id2, @dropoff_addr_id1, '2025-04-05 14:30:00', '2025-04-05 16:00:00', 'delivered'),
+(20, @bobsmith_courier_id, @pickup_addr_id3, @dropoff_addr_id2, '2025-04-12 10:00:00', '2025-04-12 11:30:00', 'delivered'),
+(21, @bobsmith_courier_id, @pickup_addr_id1, @dropoff_addr_id3, '2025-04-20 11:30:00', '2025-04-20 13:00:00', 'delivered'),
+(22, @bobsmith_courier_id, @pickup_addr_id2, @dropoff_addr_id1, '2025-04-08 10:30:00', '2025-04-08 12:00:00', 'delivered'),
+(23, @bobsmith_courier_id, @pickup_addr_id3, @dropoff_addr_id2, '2025-04-15 13:30:00', '2025-04-15 15:00:00', 'delivered');
+
+-- May 2025: 2 deliveries
+INSERT INTO deliveries (package_id, courier_id, pickup_address_id, dropoff_address_id, pickup_time, delivery_time, status) VALUES
+(24, @bobsmith_courier_id, @pickup_addr_id1, @dropoff_addr_id2, '2025-05-10 12:30:00', '2025-05-10 14:00:00', 'delivered'),
+(25, @bobsmith_courier_id, @pickup_addr_id2, @dropoff_addr_id3, '2025-05-15 09:30:00', '2025-05-15 11:00:00', 'delivered');
+
+-- June 2025: 3 deliveries
+INSERT INTO deliveries (package_id, courier_id, pickup_address_id, dropoff_address_id, pickup_time, delivery_time, status) VALUES
+(26, @bobsmith_courier_id, @pickup_addr_id3, @dropoff_addr_id1, '2025-06-05 10:30:00', '2025-06-05 12:00:00', 'delivered'),
+(27, @bobsmith_courier_id, @pickup_addr_id1, @dropoff_addr_id2, '2025-06-10 14:30:00', '2025-06-10 16:00:00', 'delivered'),
+(28, @bobsmith_courier_id, @pickup_addr_id2, @dropoff_addr_id3, '2025-06-07 11:30:00', '2025-06-07 13:00:00', 'delivered');
