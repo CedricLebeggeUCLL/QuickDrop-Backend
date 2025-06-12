@@ -406,6 +406,17 @@ exports.updateCourier = async (req, res) => {
         let startAddressId, destAddressId;
 
         if (start_address) {
+            // Ensure postal code exists or create it
+            await PostalCode.findOrCreate({
+                where: { code: start_address.postal_code },
+                defaults: {
+                    code: start_address.postal_code,
+                    city: start_address.city || 'Unknown', // Use city from request or fallback
+                    country: start_address.country || 'Belgium' // Use country from request or fallback
+                },
+                transaction
+            });
+
             const [startAddress, created] = await Address.findOrCreate({
                 where: {
                     street_name: start_address.street_name,
@@ -434,6 +445,17 @@ exports.updateCourier = async (req, res) => {
         }
 
         if (destination_address) {
+            // Ensure postal code exists or create it
+            await PostalCode.findOrCreate({
+                where: { code: destination_address.postal_code },
+                defaults: {
+                    code: destination_address.postal_code,
+                    city: destination_address.city || 'Unknown', // Use city from request or fallback
+                    country: destination_address.country || 'Belgium' // Use country from request or fallback
+                },
+                transaction
+            });
+
             const [destAddress, created] = await Address.findOrCreate({
                 where: {
                     street_name: destination_address.street_name,

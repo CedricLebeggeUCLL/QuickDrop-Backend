@@ -116,7 +116,9 @@ INSERT INTO postal_codes (code, city, country) VALUES
 ('1000', 'Brussels', 'Belgium'),
 ('1910', 'Kampenhout', 'Belgium'),
 ('2000', 'Antwerp', 'Belgium'),
-('3300', 'Tienen', 'Belgium');
+('3300', 'Tienen', 'Belgium'),
+('3001', 'Leuven', 'Belgium'),
+('3000', 'Leuven', 'Belgium');
 
 -- Insert sample addresses with coordinates
 INSERT INTO addresses (street_name, house_number, extra_info, postal_code, lat, lng) VALUES
